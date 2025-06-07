@@ -8,13 +8,39 @@ def safe_col(df, name):
             return c
     return None
 
+def status_icon(delta, pct_change):
+    if pd.isna(pct_change):
+        return "ℹ️ N/A"
+    if pct_change >= 30:
+        return "🟢 Stable"
+    elif pct_change >= 0:
+        return "🟡 Needs Review"
+    elif pct_change < 0 and pct_change > -30:
+        return "🟠 Investigate"
+    else:
+        return "🔴 Critical"
+
+def color_delta(val):
+    if "N/A" in str(val): return val
+    if "+" in str(val): return f"<span style='color:green'>{val}</span>"
+    if "-" in str(val): return f"<span style='color:red'>{val}</span>"
+    return val
+
+def color_pct(val):
+    if "N/A" in str(val): return val
+    try:
+        v = int(val.replace('%','').replace('+','').replace('-',''))
+        color = "green" if "+" in val else "red"
+        return f"<span style='color:{color}'>{val}</span>"
+    except:
+        return val
+
 def show_action_center_top10(df):
     package_col = safe_col(df, "Package")
     date_col = safe_col(df, "Date")
     gross_col = safe_col(df, "Gross Revenue")
-    fill_col = safe_col(df, "FillRate")
 
-    if date_col is None or package_col is None or gross_col is None or fill_col is None:
+    if date_col is None or package_col is None or gross_col is None:
         st.warning("Missing columns for Top 10 Trending table.")
         return
 
@@ -30,11 +56,11 @@ def show_action_center_top10(df):
     prev_period_str = f"{prev3[0].strftime('%d/%m')}-{prev3[-1].strftime('%d/%m')}"
 
     last3_grp = df[df[date_col].isin(last3)].groupby(package_col).agg(
-        {"Gross Revenue": "sum", "FillRate": "mean"}
-    ).rename(columns={"Gross Revenue": "Last 3d Revenue", "FillRate": "Last 3d Fill"})
+        {"Gross Revenue": "sum"}
+    ).rename(columns={"Gross Revenue": "Last 3d Revenue"})
     prev3_grp = df[df[date_col].isin(prev3)].groupby(package_col).agg(
-        {"Gross Revenue": "sum", "FillRate": "mean"}
-    ).rename(columns={"Gross Revenue": "Prev 3d Revenue", "FillRate": "Prev 3d Fill"})
+        {"Gross Revenue": "sum"}
+    ).rename(columns={"Gross Revenue": "Prev 3d Revenue"})
 
     merged = last3_grp.join(prev3_grp, how="outer").fillna(0)
     merged["Δ"] = merged["Last 3d Revenue"] - merged["Prev 3d Revenue"]
@@ -47,15 +73,25 @@ def show_action_center_top10(df):
     # Format numbers
     merged["Last 3d Revenue"] = merged["Last 3d Revenue"].apply(lambda x: f"${int(round(x)):,}")
     merged["Prev 3d Revenue"] = merged["Prev 3d Revenue"].apply(lambda x: f"${int(round(x)):,}")
-    merged["Δ"] = merged["Δ"].apply(lambda x: f"{'+' if x > 0 else ''}${int(round(x)):,}")
-    merged["% Change"] = merged["% Change"].apply(lambda x: f"{'+' if x>0 else ''}{int(round(x))}%" if not pd.isna(x) else "N/A")
+    merged["Δ_fmt"] = merged["Δ"].apply(lambda x: f"+${int(round(x)):,}" if x >= 0 else f"-${abs(int(round(x))):,}")
+    merged["% Change_fmt"] = merged["% Change"].apply(
+        lambda x: f"+{int(round(x))}%" if pd.notna(x) and x > 0 else (f"{int(round(x))}%" if pd.notna(x) else "N/A")
+    )
+    merged["Status"] = [status_icon(d, p) for d, p in zip(merged["Δ"], merged["% Change"])]
+
+    # Apply color formatting
+    merged["Δ_fmt"] = merged["Δ_fmt"].apply(color_delta)
+    merged["% Change_fmt"] = merged["% Change_fmt"].apply(color_pct)
 
     st.markdown(
-        f"<h5 style='margin-bottom:8px;'><span style='font-size:1.2em;'>📊</span> <b>Action Center: Top 10 Trending Packages (3d vs Prev 3d)</b></h5>",
+        f"""<h5 style='margin-bottom:8px;'><span style='font-size:1.2em;'>📊</span>
+        <b>Action Center: Top 10 Trending Packages<br>
+        <span style='font-size:0.75em;font-weight:normal;'>(Last 3d: {last_period_str} vs Prev 3d: {prev_period_str})</span></b></h5>""",
         unsafe_allow_html=True
     )
-    st.dataframe(
-        merged[[package_col, "Last 3d Revenue", "Prev 3d Revenue", "Δ", "% Change"]],
-        use_container_width=True,
-        hide_index=True
+    st.write(
+        merged[[
+            package_col, "Last 3d Revenue", "Prev 3d Revenue",
+            "Δ_fmt", "% Change_fmt", "Status"
+        ]].to_html(escape=False, index=False), unsafe_allow_html=True
     )
