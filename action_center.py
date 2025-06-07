@@ -1,79 +1,61 @@
 import streamlit as st
 import pandas as pd
-from action_center import show_action_center_top10
-from ai_insights import show_ivt_margin_alert, show_revenue_drop_table
-from ai_qna import show_ai_qna
+import numpy as np
 
-st.set_page_config(page_title="AI Revenue Action Center", layout="wide")
-st.title("📈 AI-Powered Revenue Action Center")
+def safe_col(df, name):
+    for c in df.columns:
+        if c.strip().lower() == name.strip().lower():
+            return c
+    return None
 
-uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
+def show_action_center_top10(df):
+    package_col = safe_col(df, "Package")
+    date_col = safe_col(df, "Date")
+    gross_col = safe_col(df, "Gross Revenue")
+    fill_col = safe_col(df, "FillRate")
 
-if uploaded_file:
-    df = pd.read_excel(uploaded_file)
+    if date_col is None or package_col is None or gross_col is None or fill_col is None:
+        st.warning("Missing columns for Top 10 Trending table.")
+        return
 
-    # --- Filters ---
-    def safe_col(df, name):
-        for c in df.columns:
-            if c.strip().lower() == name.strip().lower():
-                return c
-        return None
+    df[date_col] = pd.to_datetime(df[date_col])
+    all_dates = sorted(df[date_col].unique())
+    if len(all_dates) < 6:
+        st.info("Not enough days for 3d vs 3d trending.")
+        return
 
-    advertisers_col = safe_col(df, 'Advertiser')
-    channels_col = safe_col(df, 'Channel')
-    formats_col = safe_col(df, 'Ad format')
+    last3 = all_dates[-3:]
+    prev3 = all_dates[-6:-3]
+    last_period_str = f"{last3[0].strftime('%d/%m')}-{last3[-1].strftime('%d/%m')}"
+    prev_period_str = f"{prev3[0].strftime('%d/%m')}-{prev3[-1].strftime('%d/%m')}"
 
-    # Prepare filter options
-    if advertisers_col:
-        advertisers = ["(All)"] + sorted(df[advertisers_col].dropna().astype(str).unique().tolist())
-    else:
-        advertisers = ["(All)"]
-    if channels_col:
-        channels = ["(All)"] + sorted(df[channels_col].dropna().astype(str).unique().tolist())
-    else:
-        channels = ["(All)"]
-    if formats_col:
-        formats = ["(All)"] + sorted(df[formats_col].dropna().astype(str).unique().tolist())
-    else:
-        formats = ["(All)"]
+    last3_grp = df[df[date_col].isin(last3)].groupby(package_col).agg(
+        {"Gross Revenue": "sum", "FillRate": "mean"}
+    ).rename(columns={"Gross Revenue": "Last 3d Revenue", "FillRate": "Last 3d Fill"})
+    prev3_grp = df[df[date_col].isin(prev3)].groupby(package_col).agg(
+        {"Gross Revenue": "sum", "FillRate": "mean"}
+    ).rename(columns={"Gross Revenue": "Prev 3d Revenue", "FillRate": "Prev 3d Fill"})
 
-    # Show filters
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        advertiser = st.selectbox("Advertiser", options=advertisers, index=0)
-    with col2:
-        channel = st.selectbox("Channel", options=channels, index=0)
-    with col3:
-        ad_format = st.selectbox("Ad Format", options=formats, index=0)
+    merged = last3_grp.join(prev3_grp, how="outer").fillna(0)
+    merged["Δ"] = merged["Last 3d Revenue"] - merged["Prev 3d Revenue"]
+    merged["% Change"] = np.where(
+        merged["Prev 3d Revenue"] == 0, np.nan, 100 * merged["Δ"] / merged["Prev 3d Revenue"]
+    )
+    merged = merged.reset_index()
+    merged = merged.sort_values("Δ", ascending=False).head(10)
 
-    # Apply filters
-    filtered = df.copy()
-    if advertiser != "(All)" and advertisers_col:
-        filtered = filtered[filtered[advertisers_col] == advertiser]
-    if channel != "(All)" and channels_col:
-        filtered = filtered[filtered[channels_col] == channel]
-    if ad_format != "(All)" and formats_col:
-        filtered = filtered[filtered[formats_col] == ad_format]
+    # Format numbers
+    merged["Last 3d Revenue"] = merged["Last 3d Revenue"].apply(lambda x: f"${int(round(x)):,}")
+    merged["Prev 3d Revenue"] = merged["Prev 3d Revenue"].apply(lambda x: f"${int(round(x)):,}")
+    merged["Δ"] = merged["Δ"].apply(lambda x: f"{'+' if x > 0 else ''}${int(round(x)):,}")
+    merged["% Change"] = merged["% Change"].apply(lambda x: f"{'+' if x>0 else ''}{int(round(x))}%" if not pd.isna(x) else "N/A")
 
-    st.markdown("---")
-
-    # --- Top 10 Trending Packages (3d vs Prev 3d) ---
-    show_action_center_top10(filtered)
-
-    # --- IVT & Margin Alert (Last Day) ---
-    show_ivt_margin_alert(filtered)
-
-    # --- Revenue Drop Alert ---
-    show_revenue_drop_table(filtered)
-
-    # --- AI Q&A Bot ---
-    st.markdown("---")
-    st.markdown("### 🤖 Ask AI About Your Data (Optional)")
-    api_key = st.text_input("Paste your OpenAI API key to enable AI analysis (will not be saved):", type="password")
-    if api_key:
-        show_ai_qna(filtered, api_key)
-    else:
-        st.info("Enter your OpenAI API key above to enable AI Q&A.")
-
-else:
-    st.info("Please upload your Excel file to get started.")
+    st.markdown(
+        f"<h5 style='margin-bottom:8px;'><span style='font-size:1.2em;'>📊</span> <b>Action Center: Top 10 Trending Packages (3d vs Prev 3d)</b></h5>",
+        unsafe_allow_html=True
+    )
+    st.dataframe(
+        merged[[package_col, "Last 3d Revenue", "Prev 3d Revenue", "Δ", "% Change"]],
+        use_container_width=True,
+        hide_index=True
+    )
