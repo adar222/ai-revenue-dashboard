@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 
-def show_revenue_drop_table(df):
+def show_ivt_margin_alert(df):
+    # Helper for flexible column lookup
     def safe_col(df, name):
         for c in df.columns:
             if c.strip().lower() == name.strip().lower():
@@ -9,66 +10,39 @@ def show_revenue_drop_table(df):
         return None
 
     package_col = safe_col(df, "Package")
-    date_col = safe_col(df, "Date")
-    gross_col = safe_col(df, "Gross Revenue")
-    # You can try to use score, but comment it out if you want to drop
-    score_col = safe_col(df, "Score")
+    ivt_col = safe_col(df, "IVT (%)")
+    margin_col = safe_col(df, "Margin (%)")
+    rpm_col = safe_col(df, "RPM")
 
-    df[date_col] = pd.to_datetime(df[date_col])
+    # Use only the latest day
+    if 'Date' in df.columns:
+        df['Date'] = pd.to_datetime(df['Date'])
+        latest_day = df['Date'].max()
+        sub = df[df['Date'] == latest_day]
+    else:
+        sub = df
 
-    last_dates = sorted(df[date_col].unique())[-2:]
-    if len(last_dates) < 2:
-        st.warning("Not enough data for revenue drop alert.")
-        return
-
-    last_day, prev_day = last_dates[-1], last_dates[-2]
-
-    # Always group by only 'Package'
-    last_rev = df[df[date_col] == last_day].groupby(package_col)[gross_col].sum()
-    prev_rev = df[df[date_col] == prev_day].groupby(package_col)[gross_col].sum()
-    # If you want to show average score, use .mean() below. Or drop the score if you want absolutely no duplicates.
-    # scores = df[df[date_col] == last_day].groupby(package_col)[score_col].mean()
-
-    result = pd.DataFrame({
-        "Last Day Rev": last_rev,
-        "Prev Day Rev": prev_rev,
-        # "Score": scores,  # uncomment if you want average score
-    }).fillna(0)
-
-    result["Δ"] = result["Last Day Rev"] - result["Prev Day Rev"]
-    result["% Drop"] = ((result["Δ"]) / result["Prev Day Rev"] * 100).round(0)
-
-    # Only one row per package here!
-    alert_df = result[(result["Last Day Rev"] > 50) & (result["% Drop"] < -20)]
+    # Alert: IVT > 10% OR Margin < 20%
+    alert_df = sub[(sub[ivt_col] > 10) | (sub[margin_col] < 20)].copy()
 
     # Formatting
-    alert_df["Last Day Rev"] = alert_df["Last Day Rev"].apply(lambda x: f"${int(round(x)):,}")
-    alert_df["Prev Day Rev"] = alert_df["Prev Day Rev"].apply(lambda x: f"${int(round(x)):,}")
-    alert_df["Δ"] = alert_df["Δ"].apply(lambda x: f"${int(round(x)):,}" if x < 0 else f"+${int(round(x)):,}")
-    alert_df["% Drop"] = alert_df["% Drop"].apply(lambda x: f"{int(round(x))}%")
-    alert_df = alert_df.reset_index()
+    alert_df[ivt_col] = alert_df[ivt_col].round(1)
+    alert_df[margin_col] = alert_df[margin_col].round(1)
+    alert_df[rpm_col] = alert_df[rpm_col].round(3)
 
-    # If you want to show the score, re-add this section
-    # def score_icon(score):
-    #     try:
-    #         score = float(score)
-    #     except:
-    #         return ""
-    #     if score >= 80:
-    #         return f"{int(score)} 🟢"
-    #     elif score >= 60:
-    #         return f"{int(score)} 🟡"
-    #     else:
-    #         return f"{int(score)} 🔴"
-    # alert_df["Score"] = alert_df["Score"].apply(score_icon)
+    alert_df = alert_df.rename(columns={
+        package_col: "Package",
+        rpm_col: "RPM",
+        ivt_col: "IVT (%)",
+        margin_col: "Margin (%)"
+    })
 
-    # Show only the columns you want, here no score
     st.markdown(
-        "<h5 style='margin-bottom:8px;'> <span style='font-size:1.2em;'>📉</span> <b>Revenue Drop Alert (Rev > $50, >20%)</b> </h5>",
+        "<h5 style='margin-bottom:8px;'> <span style='font-size:1.2em;'>🦠</span> <b>IVT & Margin Alert (Last Day)</b> </h5>",
         unsafe_allow_html=True
     )
     st.dataframe(
-        alert_df[["Package", "Last Day Rev", "Prev Day Rev", "Δ", "% Drop"]],
+        alert_df[["Package", "RPM", "IVT (%)", "Margin (%)"]],
         use_container_width=True,
         hide_index=True
     )
