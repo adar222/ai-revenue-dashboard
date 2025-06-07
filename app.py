@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
+from action_center import show_action_center_top10
 from ai_insights import show_ivt_margin_alert, show_revenue_drop_table
+from ai_qna import show_ai_qna
 
 st.set_page_config(page_title="AI Revenue Action Center", layout="wide")
 st.title("📈 AI-Powered Revenue Action Center")
@@ -10,7 +12,7 @@ uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 if uploaded_file:
     df = pd.read_excel(uploaded_file)
 
-    # Simple filters for Advertiser, Channel, Ad Format (optional)
+    # --- Filters ---
     def safe_col(df, name):
         for c in df.columns:
             if c.strip().lower() == name.strip().lower():
@@ -23,15 +25,15 @@ if uploaded_file:
 
     # Prepare filter options
     if advertisers_col:
-        advertisers = ["(All)"] + sorted(df[advertisers_col].dropna().unique().astype(str).tolist())
+        advertisers = ["(All)"] + sorted(df[advertisers_col].dropna().astype(str).unique().tolist())
     else:
         advertisers = ["(All)"]
     if channels_col:
-        channels = ["(All)"] + sorted(df[channels_col].dropna().unique().astype(str).tolist())
+        channels = ["(All)"] + sorted(df[channels_col].dropna().astype(str).unique().tolist())
     else:
         channels = ["(All)"]
     if formats_col:
-        formats = ["(All)"] + sorted(df[formats_col].dropna().unique().astype(str).tolist())
+        formats = ["(All)"] + sorted(df[formats_col].dropna().astype(str).unique().tolist())
     else:
         formats = ["(All)"]
 
@@ -55,12 +57,23 @@ if uploaded_file:
 
     st.markdown("---")
 
-    # Show Alert Tables
+    # --- Top 10 Trending Packages (3d vs Prev 3d) ---
+    show_action_center_top10(filtered)
+
+    # --- IVT & Margin Alert (Last Day) ---
     show_ivt_margin_alert(filtered)
+
+    # --- Revenue Drop Alert ---
     show_revenue_drop_table(filtered)
 
+    # --- AI Q&A Bot ---
     st.markdown("---")
+    st.markdown("### 🤖 Ask AI About Your Data (Optional)")
+    api_key = st.text_input("Paste your OpenAI API key to enable AI analysis (will not be saved):", type="password")
+    if api_key:
+        show_ai_qna(filtered, api_key)
+    else:
+        st.info("Enter your OpenAI API key above to enable AI Q&A.")
 
-    st.info("For more advanced AI or insights, please contact your data team.")
 else:
     st.info("Please upload your Excel file to get started.")
