@@ -38,7 +38,7 @@ def show_revenue_drop_insight(df, advertiser):
         df_last.groupby(package_col).agg({grossrev_col:'sum', fill_col:'mean', margin_col:'mean', ivt_col:'mean'}).rename(columns=lambda x: x+'_last'),
         df_prev.groupby(package_col).agg({grossrev_col:'sum', fill_col:'mean', margin_col:'mean', ivt_col:'mean'}).rename(columns=lambda x: x+'_prev'),
         left_index=True, right_index=True, how='outer').fillna(0)
-    )
+    
     merged['Rev Δ'] = merged[f'{grossrev_col}_last'] - merged[f'{grossrev_col}_prev']
     merged['Fill Δ'] = merged[f'{fill_col}_last'] - merged[f'{fill_col}_prev']
     merged['Margin Δ'] = merged[f'{margin_col}_last'] - merged[f'{margin_col}_prev']
