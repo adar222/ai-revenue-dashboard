@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from action_center import show_action_center_top10
 from ai_qna import show_ai_qna
-from ai_insights import show_revenue_drop_insight, show_ivt_margin_alert, show_revenue_drop_table
+from ai_insights import show_revenue_drop_table
 
 st.set_page_config(page_title="AI Revenue Action Center", layout="wide")
 st.title("📈 AI-Powered Revenue Action Center")
