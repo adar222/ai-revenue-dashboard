@@ -3,4 +3,5 @@ pandas
 openai
 numpy
 openpyxl
+tabulate
 
