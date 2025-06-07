@@ -1,14 +1,13 @@
 import streamlit as st
 import pandas as pd
 
-def show_ivt_margin_alert(df):
-    # Helper for flexible column lookup
-    def safe_col(df, name):
-        for c in df.columns:
-            if c.strip().lower() == name.strip().lower():
-                return c
-        return None
+def safe_col(df, name):
+    for c in df.columns:
+        if c.strip().lower() == name.strip().lower():
+            return c
+    return None
 
+def show_ivt_margin_alert(df):
     package_col = safe_col(df, "Package")
     ivt_col = safe_col(df, "IVT (%)")
     margin_col = safe_col(df, "Margin (%)")
@@ -48,12 +47,6 @@ def show_ivt_margin_alert(df):
     )
 
 def show_revenue_drop_table(df):
-    def safe_col(df, name):
-        for c in df.columns:
-            if c.strip().lower() == name.strip().lower():
-                return c
-        return None
-
     package_col = safe_col(df, "Package")
     date_col = safe_col(df, "Date")
     gross_col = safe_col(df, "Gross Revenue")
