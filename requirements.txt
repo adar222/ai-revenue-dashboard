@@ -1,7 +1,5 @@
 streamlit
 pandas
 openai
-numpy
-openpyxl
 tabulate
-
+numpy
