@@ -16,28 +16,36 @@ if not uploaded_file:
 df = pd.read_excel(uploaded_file)
 df['Date'] = pd.to_datetime(df['Date'])
 
-# --- Formatting Helpers (with commas) ---
+# --- Date Ranges ---
+dates = sorted(df['Date'].unique())
+if len(dates) < 6:
+    st.warning("Need at least 6 days of data for 3d vs 3d comparison!")
+    st.stop()
+
+last3d = dates[-3:]
+prev3d = dates[-6:-3]
+
 def format_money(val):
     try:
-        return "${:,}".format(int(round(val)))
-    except:
-        return ""
-
-def format_margin(val):
-    try:
-        return "{:,}%".format(int(round(float(val))))
-    except:
-        return ""
-
-def format_pct(val):
-    try:
-        return "{:,}%".format(int(round(float(val))))
+        return f"${int(round(val)):,}"
     except:
         return ""
 
 def format_int(val):
     try:
-        return "{:,}".format(int(round(val)))
+        return f"{int(round(val)):,}"
+    except:
+        return ""
+
+def format_margin(val):
+    try:
+        return f"{int(round(float(val))):,}%"
+    except:
+        return ""
+
+def format_pct(val):
+    try:
+        return f"{int(round(float(val))):,}%"
     except:
         return ""
 
@@ -49,14 +57,7 @@ def realtime_status(change):
     else:
         return "🔴 Critical"
 
-# --- Date Ranges ---
-dates = sorted(df['Date'].unique())
-if len(dates) < 6:
-    st.warning("Need at least 6 days of data for 3d vs 3d comparison!")
-    st.stop()
-
-last3d = dates[-3:]
-prev3d = dates[-6:-3]
+# --- Trending Table ---
 last_range = f"{last3d[0].strftime('%d/%m')}-{last3d[-1].strftime('%d/%m')}"
 prev_range = f"{prev3d[0].strftime('%d/%m')}-{prev3d[-1].strftime('%d/%m')}"
 
@@ -86,7 +87,7 @@ ac_table = merged[['Package', f"Last 3d Revenue ({last_range})", f"Prev 3d Reven
 ac_table[f"Last 3d Revenue ({last_range})"] = ac_table[f"Last 3d Revenue ({last_range})"].apply(format_money)
 ac_table[f"Prev 3d Revenue ({prev_range})"] = ac_table[f"Prev 3d Revenue ({prev_range})"].apply(format_money)
 ac_table['Δ Amount'] = ac_table['Δ Amount'].apply(format_money)
-ac_table['% Change'] = ac_table['% Change'].apply(lambda x: f"{x:,.0f}%")
+ac_table['% Change'] = ac_table['% Change'].apply(lambda x: f"{x:.0f}%")
 
 # --- MAIN TAB ---
 if tab == "Dashboard":
@@ -152,7 +153,7 @@ if tab == "Dashboard":
     agg_drop = agg_drop[agg_drop['Gross Revenue'] > gross_rev_min]
     agg_drop['Gross Revenue'] = agg_drop['Gross Revenue'].apply(format_money)
     agg_drop['Gross Revenue_prev'] = agg_drop['Gross Revenue_prev'].apply(format_money)
-    agg_drop['% Drop'] = agg_drop['% Drop'].apply(lambda x: f"{x:,.0f}%")
+    agg_drop['% Drop'] = agg_drop['% Drop'].apply(lambda x: f"{x:.0f}%")
 
     for _, row in agg_drop.iterrows():
         pkg_name = row['Package']
@@ -165,7 +166,7 @@ if tab == "Dashboard":
             breakdown_table = breakdown[['Ad format', 'Gross Revenue', 'Gross Revenue_prev', '% Drop']].copy()
             breakdown_table['Gross Revenue'] = breakdown_table['Gross Revenue'].apply(format_money)
             breakdown_table['Gross Revenue_prev'] = breakdown_table['Gross Revenue_prev'].apply(format_money)
-            breakdown_table['% Drop'] = breakdown_table['% Drop'].apply(lambda x: f"{x:,.0f}%")
+            breakdown_table['% Drop'] = breakdown_table['% Drop'].apply(lambda x: f"{x:.0f}%")
             st.dataframe(
                 breakdown_table.style.set_properties(
                     subset=['Gross Revenue', 'Gross Revenue_prev', '% Drop'],
@@ -181,68 +182,66 @@ if tab == "Dashboard":
     api_key = st.text_input("Enter your OpenAI API key:", type="password")
     user_q = st.text_input("Type your question about a package, e.g.: 'Why did com.tripedot.woodoku drop?'")
     ask_button = st.button("Ask AI")
-
-if api_key and user_q and ask_button:
-    trending_pkgs = merged.sort_values(f"Last 3d Revenue ({last_range})", ascending=False).head(15)['Package'].tolist()
-    context_rows = []
-    for pkg in trending_pkgs:
-        last = df[(df['Package'] == pkg) & (df['Date'].isin(last3d))]
-        prev = df[(df['Package'] == pkg) & (df['Date'].isin(prev3d))]
-        def safe_mean(series):
-            return None if len(series) == 0 else np.nanmean(series)
-        last_rev = last['Gross Revenue'].sum()
-        prev_rev = prev['Gross Revenue'].sum()
-        last_rpm = safe_mean(last['RPM']) if 'RPM' in last.columns else None
-        prev_rpm = safe_mean(prev['RPM']) if 'RPM' in prev.columns else None
-        last_cpm = safe_mean(last['CPM']) if 'CPM' in last.columns else None
-        prev_cpm = safe_mean(prev['CPM']) if 'CPM' in prev.columns else None
-        last_fill = safe_mean(last['Fill Rate']) if 'Fill Rate' in last.columns else None
-        prev_fill = safe_mean(prev['Fill Rate']) if 'Fill Rate' in prev.columns else None
-        row = f"""Package: {pkg}
+    if api_key and user_q and ask_button:
+        trending_pkgs = merged.sort_values(f"Last 3d Revenue ({last_range})", ascending=False).head(15)['Package'].tolist()
+        context_rows = []
+        for pkg in trending_pkgs:
+            last = df[(df['Package'] == pkg) & (df['Date'].isin(last3d))]
+            prev = df[(df['Package'] == pkg) & (df['Date'].isin(prev3d))]
+            def safe_mean(series):
+                return None if len(series) == 0 else np.nanmean(series)
+            last_rev = last['Gross Revenue'].sum()
+            prev_rev = prev['Gross Revenue'].sum()
+            last_rpm = safe_mean(last['RPM']) if 'RPM' in last.columns else None
+            prev_rpm = safe_mean(prev['RPM']) if 'RPM' in prev.columns else None
+            last_cpm = safe_mean(last['CPM']) if 'CPM' in last.columns else None
+            prev_cpm = safe_mean(prev['CPM']) if 'CPM' in prev.columns else None
+            last_fill = safe_mean(last['Fill Rate']) if 'Fill Rate' in last.columns else None
+            prev_fill = safe_mean(prev['Fill Rate']) if 'Fill Rate' in prev.columns else None
+            row = f"""Package: {pkg}
 Last3d Revenue: {format_int(last_rev)}
 Prev3d Revenue: {format_int(prev_rev)}
 Last3d RPM: {last_rpm:.2f}  Prev3d RPM: {prev_rpm:.2f}""" if last_rpm is not None and prev_rpm is not None else ""
-        row += f"\nLast3d CPM: {last_cpm:.2f}  Prev3d CPM: {prev_cpm:.2f}" if last_cpm is not None and prev_cpm is not None else ""
-        row += f"\nLast3d Fill Rate: {last_fill:.2f}  Prev3d Fill Rate: {prev_fill:.2f}" if last_fill is not None and prev_fill is not None else ""
-        context_rows.append(row)
-    data_context = "\n".join(context_rows)
-    system_prompt = (
-        "You are an AI assistant for a programmatic revenue team. "
-        "You will receive questions from managers about why ad revenue changed for a given app/package. "
-        "You have context with historical performance data for the top packages. "
-        "Base your answers only on this context. If you don't know, say so. "
-        "Summarize key changes in metrics (RPM, CPM, Fill Rate, Requests, Impressions, etc) in bullet points. "
-        "Always use simple business language."
-    )
-    prompt = (
-        f"{system_prompt}\n\n"
-        f"DATA CONTEXT:\n{data_context}\n\n"
-        f"QUESTION: {user_q}\n\n"
-        "Give your answer in clear bullet points."
-    )
-    with st.spinner("Thinking..."):
-        try:
-            client = openai.OpenAI(api_key=api_key)
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=512,
-                temperature=0.3,
-            )
-            answer = response.choices[0].message.content
-            st.markdown(answer)
-        except Exception as e:
-            st.error(f"AI Error: {e}")
+            row += f"\nLast3d CPM: {last_cpm:.2f}  Prev3d CPM: {prev_cpm:.2f}" if last_cpm is not None and prev_cpm is not None else ""
+            row += f"\nLast3d Fill Rate: {last_fill:.2f}  Prev3d Fill Rate: {prev_fill:.2f}" if last_fill is not None and prev_fill is not None else ""
+            context_rows.append(row)
+        data_context = "\n".join(context_rows)
+        system_prompt = (
+            "You are an AI assistant for a programmatic revenue team. "
+            "You will receive questions from managers about why ad revenue changed for a given app/package. "
+            "You have context with historical performance data for the top packages. "
+            "Base your answers only on this context. If you don't know, say so. "
+            "Summarize key changes in metrics (RPM, CPM, Fill Rate, Requests, Impressions, etc) in bullet points. "
+            "Always use simple business language."
+        )
+        prompt = (
+            f"{system_prompt}\n\n"
+            f"DATA CONTEXT:\n{data_context}\n\n"
+            f"QUESTION: {user_q}\n\n"
+            "Give your answer in clear bullet points."
+        )
+        with st.spinner("Thinking..."):
+            try:
+                client = openai.OpenAI(api_key=api_key)
+                response = client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=512,
+                    temperature=0.3,
+                )
+                answer = response.choices[0].message.content
+                st.markdown(answer)
+            except Exception as e:
+                st.error(f"AI Error: {e}")
 
-
-# ------------- AI INSIGHTS TAB -------------
-if tab == "AI Insights":
+elif tab == "AI Insights":
     st.header("🧠 AI Insights — Top 15 Packages Revenue Trends")
     st.caption(f"(Last 3d: {last3d[0].strftime('%d/%m')}–{last3d[-1].strftime('%d/%m')} vs Prev 3d: {prev3d[0].strftime('%d/%m')}–{prev3d[-1].strftime('%d/%m')})")
-    for idx, row in merged.iterrows():
+
+    for idx, row in merged.head(15).iterrows():
         pkg = row['Package']
         change = row['% Change']
         trend_icon = "🟢" if change > 0 else "🔴"
@@ -299,7 +298,7 @@ if tab == "AI Insights":
                     icon = "🟢" if pct > 0 else "🔴"
                     bullet_points.append(f"{icon} RPM {'up' if pct>0 else 'down'} by {abs(int(pct)):,}%")
 
-        # Non-obvious/invented examples
+        # --- Non-obvious/invented examples ---
         if pkg == "com.block.game.jigsaw.puzzles":
             bullet_points.append("🔴 Revenue drop is driven by a spike in IVT (invalid traffic) detected, causing blocks by demand partners.")
         if pkg == "com.goods.master3d.triple.puzzle":
@@ -316,6 +315,7 @@ if tab == "AI Insights":
         if not bullet_points:
             bullet_points.append("No significant metric change detected.")
 
+        # --- Show in clean block ---
         st.markdown(f"""
 **{trend_icon} {pkg}**
 - **Revenue {'Up' if change>0 else 'Down'} {abs(int(change)):,}%** (from {format_int(prev_rev)} to {format_int(last_rev)}; Main format: {top_adformat})
