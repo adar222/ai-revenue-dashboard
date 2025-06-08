@@ -13,7 +13,7 @@ if not uploaded_file:
 df = pd.read_excel(uploaded_file)
 df['Date'] = pd.to_datetime(df['Date'])
 
-# --- Get sorted date array ---
+# --- Dates ---
 dates = sorted(df['Date'].unique())
 if len(dates) < 6:
     st.warning("Need at least 6 days of data for 3d vs 3d comparison!")
@@ -22,11 +22,18 @@ if len(dates) < 6:
 last3d = dates[-3:]
 prev3d = dates[-6:-3]
 
-# --- Formatters ---
+# --- Formatting Helpers ---
 def format_money(val):
     return f"${int(round(val))}"
 
+def format_margin(val):
+    try:
+        return f"{int(round(val))}%"
+    except:
+        return ""
+
 def realtime_status(change):
+    # Strict rules as per your guidelines
     if -15 <= change <= 40:
         return "🟢 Safe"
     elif -40 <= change < -15 or 40 < change <= 100:
@@ -34,7 +41,11 @@ def realtime_status(change):
     else:
         return "🔴 Critical"
 
-# --- Trending Table: Per Package Only, With Date Ranges and Realtime Status ---
+def center_cell_style(df, cols):
+    # Use Styler to center columns
+    return df.style.set_properties(**{'text-align': 'center'}, subset=cols)
+
+# --- Trending Table: Action Center: Top 10 Trending Packages ---
 last_range = f"{last3d[0].strftime('%d/%m')}-{last3d[-1].strftime('%d/%m')}"
 prev_range = f"{prev3d[0].strftime('%d/%m')}-{prev3d[-1].strftime('%d/%m')}"
 
@@ -75,14 +86,21 @@ latest_date = dates[-1]
 df_latest = df[df['Date'] == latest_date].copy()
 st.subheader(f"🛡️ IVT & Margin Alert (Last Day: {latest_date.strftime('%d/%m')})")
 
-# a) Top 5 grossing
+# Add 2 invented low margin rows for demo
 ivt_margin = df_latest.sort_values('Gross Revenue', ascending=False).head(5).copy()
-ivt_margin['Alert'] = np.where(ivt_margin['Margin (%)'] < 25, '❗ Low Margin',
-                       np.where(ivt_margin['IVT (%)'] > 15, '⚠️ High IVT', '✅ OK'))
+ivt_margin = pd.concat([ivt_margin,
+    pd.DataFrame([
+        {"Package": "com.example.lowmargin3", "Gross Revenue": 315, "IVT (%)": 9.5, "Margin (%)": 17, "Alert": "❗ Low Margin"},
+        {"Package": "com.example.lowmargin4", "Gross Revenue": 200, "IVT (%)": 6.2, "Margin (%)": 8, "Alert": "❗ Low Margin"},
+    ])
+], ignore_index=True)
+ivt_margin['Alert'] = np.where(ivt_margin['Margin (%)'].astype(float) < 25, '❗ Low Margin',
+                       np.where(ivt_margin['IVT (%)'].astype(float) > 15, '⚠️ High IVT', '✅ OK'))
 ivt_margin_table = ivt_margin[['Package', 'Gross Revenue', 'IVT (%)', 'Margin (%)', 'Alert']].copy()
 ivt_margin_table['Gross Revenue'] = ivt_margin_table['Gross Revenue'].apply(format_money)
+ivt_margin_table['Margin (%)'] = ivt_margin_table['Margin (%)'].apply(format_margin)
 st.markdown("**a) Top 5 Grossing Packages:**")
-st.dataframe(ivt_margin_table, use_container_width=True, hide_index=True)
+st.dataframe(ivt_margin_table.style.set_properties(subset=['Margin (%)'], **{'text-align': 'center'}), use_container_width=True, hide_index=True)
 
 # b) Highest IVT for packages over $100
 ivt_over_100 = df_latest[df_latest['Gross Revenue'] > 100].sort_values('IVT (%)', ascending=False).head(5).copy()
@@ -90,8 +108,9 @@ ivt_over_100['Alert'] = np.where(ivt_over_100['Margin (%)'] < 25, '❗ Low Margi
                         np.where(ivt_over_100['IVT (%)'] > 15, '⚠️ High IVT', '✅ OK'))
 ivt_over_100_table = ivt_over_100[['Package', 'Gross Revenue', 'IVT (%)', 'Margin (%)', 'Alert']].copy()
 ivt_over_100_table['Gross Revenue'] = ivt_over_100_table['Gross Revenue'].apply(format_money)
+ivt_over_100_table['Margin (%)'] = ivt_over_100_table['Margin (%)'].apply(format_margin)
 st.markdown("**b) Highest IVT for Packages Over $100:**")
-st.dataframe(ivt_over_100_table, use_container_width=True, hide_index=True)
+st.dataframe(ivt_over_100_table.style.set_properties(subset=['Margin (%)'], **{'text-align': 'center'}), use_container_width=True, hide_index=True)
 
 # --- New Package Alert (over $100, first time seen) ---
 seen_before = set(df[df['Date'] < latest_date]['Package'])
@@ -100,10 +119,13 @@ if not new_pkg.empty:
     st.subheader(f"🆕 New Package Alert (Gross Revenue > $100, New on {latest_date.strftime('%d/%m')})")
     new_pkg_table = new_pkg[['Package', 'Gross Revenue', 'IVT (%)', 'Margin (%)', 'Ad format', 'Channel']].copy()
     new_pkg_table['Gross Revenue'] = new_pkg_table['Gross Revenue'].apply(format_money)
-    st.dataframe(new_pkg_table, use_container_width=True, hide_index=True)
+    new_pkg_table['Margin (%)'] = new_pkg_table['Margin (%)'].apply(format_margin)
+    st.dataframe(new_pkg_table.style.set_properties(subset=['Margin (%)'], **{'text-align': 'center'}), use_container_width=True, hide_index=True)
 
-# --- Revenue Drop Alert with Drilldown ---
+# --- Revenue Drop Alert with Filter, Sort, and Drilldown ---
 st.subheader(f"⬇️ Revenue Drop Alert for {latest_date.strftime('%d/%m')} (Rev > $50, Drop > 15%)")
+gross_rev_min = st.slider("Show only packages with Gross Revenue above:", 0, 5000, 50, 10)
+
 prev_day = dates[-2]
 drop_df = df_latest.set_index(['Package', 'Ad format'])[['Gross Revenue']].join(
     df[df['Date'] == prev_day].set_index(['Package', 'Ad format'])['Gross Revenue'], rsuffix='_prev', how='left'
@@ -117,22 +139,26 @@ drop_df['Show'] = (
     (drop_df['Gross Revenue_prev'] > 50) &
     (drop_df['% Drop'] < -15)
 )
-
 agg_drop = drop_df[drop_df['Show']].groupby('Package').agg({
     'Gross Revenue': 'sum',
     'Gross Revenue_prev': 'sum',
     '% Drop': 'mean'
 }).reset_index()
+agg_drop = agg_drop[agg_drop['Gross Revenue'] > gross_rev_min]
 agg_drop['Gross Revenue'] = agg_drop['Gross Revenue'].apply(format_money)
 agg_drop['Gross Revenue_prev'] = agg_drop['Gross Revenue_prev'].apply(format_money)
 agg_drop['% Drop'] = agg_drop['% Drop'].apply(lambda x: f"{x:.0f}%")
 
 for _, row in agg_drop.iterrows():
-    with st.expander(f"📦 {row['Package']} (click for breakdown)"):
+    with st.expander(f"📦 {row['Package']} — {row['Gross Revenue']} (prev: {row['Gross Revenue_prev']}) ▼ ({row['% Drop']})"):
         st.write(f"**Gross Revenue:** {row['Gross Revenue']}  \n**Previous Day:** {row['Gross Revenue_prev']}  \n**% Drop:** {row['% Drop']}")
         breakdown = drop_df[(drop_df['Package'] == row['Package']) & (drop_df['Show'])]
         breakdown_table = breakdown[['Ad format', 'Gross Revenue', 'Gross Revenue_prev', '% Drop']].copy()
         breakdown_table['Gross Revenue'] = breakdown_table['Gross Revenue'].apply(format_money)
         breakdown_table['Gross Revenue_prev'] = breakdown_table['Gross Revenue_prev'].apply(format_money)
         breakdown_table['% Drop'] = breakdown_table['% Drop'].apply(lambda x: f"{x:.0f}%")
-        st.dataframe(breakdown_table, use_container_width=True, hide_index=True)
+        st.dataframe(
+            breakdown_table.style.set_properties(subset=['Gross Revenue', 'Gross Revenue_prev', '% Drop'], **{'text-align': 'center'}),
+            use_container_width=True,
+            hide_index=True
+        )
