@@ -15,19 +15,8 @@ df = pd.read_excel(uploaded_file)
 # --- Convert date to datetime ---
 df['Date'] = pd.to_datetime(df['Date'])
 
-# --- 1. Action Center: Top 10 Trending Packages (3d comparison) ---
-# Get unique sorted dates
-dates = sorted(df['Date'].unique())
-if len(dates) < 6:
-    st.warning("Need at least 6 days of data for 3d vs 3d comparison!")
-    st.stop()
-
-# Compute last 3d and prev 3d windows
-last3d = dates[-3:]
-prev3d = dates[-6:-3]
-
-# Aggregate gross revenue by package for both periods
-def agg_3d(period):
+# --- Trending Table: Per Package Only (Option 1) ---
+def agg_3d_simple(period):
     return (
         df[df['Date'].isin(period)]
         .groupby('Package', as_index=False)['Gross Revenue']
@@ -35,8 +24,8 @@ def agg_3d(period):
         .rename(columns={'Gross Revenue': f"Revenue_{period[-1].strftime('%m-%d')}"})
     )
 
-last_agg = agg_3d(last3d)
-prev_agg = agg_3d(prev3d)
+last_agg = agg_3d_simple(last3d)
+prev_agg = agg_3d_simple(prev3d)
 merged = pd.merge(
     last_agg, prev_agg, how='outer', on='Package'
 ).fillna(0)
@@ -46,7 +35,7 @@ merged['% Change'] = np.where(
     (merged[last_agg.columns[-1]] - merged[prev_agg.columns[-1]]) / merged[prev_agg.columns[-1]] * 100,
     100.0
 )
-# Status logic from original df (use latest date's status if available)
+# Status logic (take most recent in the last 3d period)
 latest_status = (
     df[df['Date'].isin(last3d)][['Package', 'Status']]
     .drop_duplicates('Package', keep='last').set_index('Package')['Status']
@@ -54,18 +43,14 @@ latest_status = (
 merged['Status'] = merged['Package'].map(latest_status).fillna('-')
 merged = merged.sort_values(last_agg.columns[-1], ascending=False).head(10)
 
-# Format table
-def format_money(val):
-    return f"${int(round(val))}"
-
-st.subheader(f"📊 Action Center: Top 10 Trending Packages")
-st.caption(f"(Last 3d: {last3d[0].strftime('%d/%m')}-{last3d[-1].strftime('%d/%m')} vs Prev 3d: {prev3d[0].strftime('%d/%m')}-{prev3d[-1].strftime('%d/%m')})")
+# Format and display
 ac_table = merged[['Package', last_agg.columns[-1], prev_agg.columns[-1], 'Δ Amount', '% Change', 'Status']].copy()
 ac_table[last_agg.columns[-1]] = ac_table[last_agg.columns[-1]].apply(format_money)
 ac_table[prev_agg.columns[-1]] = ac_table[prev_agg.columns[-1]].apply(format_money)
 ac_table['Δ Amount'] = ac_table['Δ Amount'].apply(format_money)
 ac_table['% Change'] = ac_table['% Change'].apply(lambda x: f"{x:.0f}%")
 st.dataframe(ac_table, use_container_width=True)
+
 
 # --- 2. IVT & Margin Alert (Last Day) ---
 latest_date = dates[-1]
