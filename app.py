@@ -90,10 +90,10 @@ ivt_margin = pd.concat([ivt_margin,
 ], ignore_index=True)
 ivt_margin['Alert'] = np.where(ivt_margin['Margin (%)'].astype(float) < 25, '❗ Low Margin',
                        np.where(ivt_margin['IVT (%)'].astype(float) > 15, '⚠️ High IVT', '✅ OK'))
-ivt_margin_table = ivt_margin[['Package', 'Gross Revenue', 'IVT (%)', 'Margin (%)', 'Alert']].copy()
 ivt_margin_table['Gross Revenue'] = ivt_margin_table['Gross Revenue'].apply(format_money)
 ivt_margin_table['Margin (%)'] = ivt_margin_table['Margin (%)'].apply(format_margin)
-ivt_margin_table = ivt_margin_table.style.set_properties(subset=['Margin (%)'], **{'text-align': 'center'})
+ivt_margin_table['IVT (%)'] = ivt_margin_table['IVT (%)'].apply(lambda x: f"{int(round(float(x)))}%")
+ivt_margin_table = ivt_margin_table.style.set_properties(subset=['Margin (%)', 'IVT (%)'], **{'text-align': 'center'})
 st.markdown("**a) Top 5 Grossing Packages:**")
 st.dataframe(ivt_margin_table, use_container_width=True, hide_index=True)
 
