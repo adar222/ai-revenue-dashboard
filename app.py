@@ -16,27 +16,28 @@ if not uploaded_file:
 df = pd.read_excel(uploaded_file)
 df['Date'] = pd.to_datetime(df['Date'])
 
-# --- Date Ranges ---
-dates = sorted(df['Date'].unique())
-if len(dates) < 6:
-    st.warning("Need at least 6 days of data for 3d vs 3d comparison!")
-    st.stop()
-
-last3d = dates[-3:]
-prev3d = dates[-6:-3]
-
+# --- Formatting Helpers (with commas) ---
 def format_money(val):
-    return f"${int(round(val))}"
+    try:
+        return "${:,}".format(int(round(val)))
+    except:
+        return ""
 
 def format_margin(val):
     try:
-        return f"{int(round(float(val)))}%"
+        return "{:,}%".format(int(round(float(val))))
     except:
         return ""
 
 def format_pct(val):
     try:
-        return f"{int(round(float(val)))}%"
+        return "{:,}%".format(int(round(float(val))))
+    except:
+        return ""
+
+def format_int(val):
+    try:
+        return "{:,}".format(int(round(val)))
     except:
         return ""
 
@@ -48,7 +49,14 @@ def realtime_status(change):
     else:
         return "🔴 Critical"
 
-# --- Trending Table ---
+# --- Date Ranges ---
+dates = sorted(df['Date'].unique())
+if len(dates) < 6:
+    st.warning("Need at least 6 days of data for 3d vs 3d comparison!")
+    st.stop()
+
+last3d = dates[-3:]
+prev3d = dates[-6:-3]
 last_range = f"{last3d[0].strftime('%d/%m')}-{last3d[-1].strftime('%d/%m')}"
 prev_range = f"{prev3d[0].strftime('%d/%m')}-{prev3d[-1].strftime('%d/%m')}"
 
@@ -78,7 +86,7 @@ ac_table = merged[['Package', f"Last 3d Revenue ({last_range})", f"Prev 3d Reven
 ac_table[f"Last 3d Revenue ({last_range})"] = ac_table[f"Last 3d Revenue ({last_range})"].apply(format_money)
 ac_table[f"Prev 3d Revenue ({prev_range})"] = ac_table[f"Prev 3d Revenue ({prev_range})"].apply(format_money)
 ac_table['Δ Amount'] = ac_table['Δ Amount'].apply(format_money)
-ac_table['% Change'] = ac_table['% Change'].apply(lambda x: f"{x:.0f}%")
+ac_table['% Change'] = ac_table['% Change'].apply(lambda x: f"{x:,.0f}%")
 
 # --- MAIN TAB ---
 if tab == "Dashboard":
@@ -144,7 +152,7 @@ if tab == "Dashboard":
     agg_drop = agg_drop[agg_drop['Gross Revenue'] > gross_rev_min]
     agg_drop['Gross Revenue'] = agg_drop['Gross Revenue'].apply(format_money)
     agg_drop['Gross Revenue_prev'] = agg_drop['Gross Revenue_prev'].apply(format_money)
-    agg_drop['% Drop'] = agg_drop['% Drop'].apply(lambda x: f"{x:.0f}%")
+    agg_drop['% Drop'] = agg_drop['% Drop'].apply(lambda x: f"{x:,.0f}%")
 
     for _, row in agg_drop.iterrows():
         pkg_name = row['Package']
@@ -157,7 +165,7 @@ if tab == "Dashboard":
             breakdown_table = breakdown[['Ad format', 'Gross Revenue', 'Gross Revenue_prev', '% Drop']].copy()
             breakdown_table['Gross Revenue'] = breakdown_table['Gross Revenue'].apply(format_money)
             breakdown_table['Gross Revenue_prev'] = breakdown_table['Gross Revenue_prev'].apply(format_money)
-            breakdown_table['% Drop'] = breakdown_table['% Drop'].apply(lambda x: f"{x:.0f}%")
+            breakdown_table['% Drop'] = breakdown_table['% Drop'].apply(lambda x: f"{x:,.0f}%")
             st.dataframe(
                 breakdown_table.style.set_properties(
                     subset=['Gross Revenue', 'Gross Revenue_prev', '% Drop'],
@@ -191,8 +199,8 @@ if tab == "Dashboard":
             last_fill = safe_mean(last['Fill Rate']) if 'Fill Rate' in last.columns else None
             prev_fill = safe_mean(prev['Fill Rate']) if 'Fill Rate' in prev.columns else None
             row = f"""Package: {pkg}
-Last3d Revenue: {int(last_rev)}
-Prev3d Revenue: {int(prev_rev)}
+Last3d Revenue: {format_int(last_rev)}
+Prev3d Revenue: {format_int(prev_rev)}
 Last3d RPM: {last_rpm:.2f}  Prev3d RPM: {prev_rpm:.2f}""" if last_rpm is not None and prev_rpm is not None else ""
             row += f"\nLast3d CPM: {last_cpm:.2f}  Prev3d CPM: {prev_cpm:.2f}" if last_cpm is not None and prev_cpm is not None else ""
             row += f"\nLast3d Fill Rate: {last_fill:.2f}  Prev3d Fill Rate: {prev_fill:.2f}" if last_fill is not None and prev_fill is not None else ""
@@ -229,94 +237,88 @@ Last3d RPM: {last_rpm:.2f}  Prev3d RPM: {prev_rpm:.2f}""" if last_rpm is not Non
             except Exception as e:
                 st.error(f"AI Error: {e}")
 
-import streamlit as st
-import numpy as np
+# ------------- AI INSIGHTS TAB -------------
+if tab == "AI Insights":
+    st.header("🧠 AI Insights — Top 15 Packages Revenue Trends")
+    st.caption(f"(Last 3d: {last3d[0].strftime('%d/%m')}–{last3d[-1].strftime('%d/%m')} vs Prev 3d: {prev3d[0].strftime('%d/%m')}–{prev3d[-1].strftime('%d/%m')})")
+    for idx, row in merged.iterrows():
+        pkg = row['Package']
+        change = row['% Change']
+        trend_icon = "🟢" if change > 0 else "🔴"
 
-# ---- AI Insights: Top 15 Packages Revenue Trends ----
-st.header("🧠 AI Insights — Top 15 Packages Revenue Trends")
-st.caption(f"(Last 3d: {last3d[0].strftime('%d/%m')}–{last3d[-1].strftime('%d/%m')} vs Prev 3d: {prev3d[0].strftime('%d/%m')}–{prev3d[-1].strftime('%d/%m')})")
+        # Get recent ad format by revenue
+        last_data = df[(df['Package'] == pkg) & (df['Date'].isin(last3d))]
+        prev_data = df[(df['Package'] == pkg) & (df['Date'].isin(prev3d))]
+        if not last_data.empty and 'Ad format' in last_data.columns:
+            top_adformat = last_data.groupby('Ad format')['Gross Revenue'].sum().idxmax()
+        else:
+            top_adformat = "N/A"
 
-for idx, row in merged.head(15).iterrows():
-    pkg = row['Package']
-    change = row['% Change']
-    trend_icon = "🟢" if change > 0 else "🔴"
+        last_rev = last_data['Gross Revenue'].sum()
+        prev_rev = prev_data['Gross Revenue'].sum()
+        bullet_points = []
 
-    # Get recent ad format by revenue
-    last_data = df[(df['Package'] == pkg) & (df['Date'].isin(last3d))]
-    prev_data = df[(df['Package'] == pkg) & (df['Date'].isin(prev3d))]
-    if not last_data.empty and 'Ad format' in last_data.columns:
-        top_adformat = last_data.groupby('Ad format')['Gross Revenue'].sum().idxmax()
-    else:
-        top_adformat = "N/A"
-
-    last_rev = last_data['Gross Revenue'].sum()
-    prev_rev = prev_data['Gross Revenue'].sum()
-    bullet_points = []
-
-    # --- Basic metrics
-    # Impressions
-    impressions_last = last_data['Impressions'].sum() if 'Impressions' in last_data else None
-    impressions_prev = prev_data['Impressions'].sum() if 'Impressions' in prev_data else None
-    if impressions_last is not None and impressions_prev is not None:
-        diff = impressions_last - impressions_prev
-        pct = (diff / impressions_prev) * 100 if impressions_prev > 0 else 0
-        if abs(pct) > 7:
-            icon = "🟢" if pct > 0 else "🔴"
-            bullet_points.append(f"{icon} Impressions {'increased' if pct>0 else 'decreased'} by {abs(int(pct))}%")
-
-    # Fill Rate
-    if 'Fill Rate' in last_data and 'Fill Rate' in prev_data:
-        fill_last = last_data['Fill Rate'].mean()
-        fill_prev = prev_data['Fill Rate'].mean()
-        if not np.isnan(fill_last) and not np.isnan(fill_prev):
-            pct = fill_last - fill_prev
-            if abs(pct) > 2:
+        # Impressions
+        impressions_last = last_data['Impressions'].sum() if 'Impressions' in last_data else None
+        impressions_prev = prev_data['Impressions'].sum() if 'Impressions' in prev_data else None
+        if impressions_last is not None and impressions_prev is not None:
+            diff = impressions_last - impressions_prev
+            pct = (diff / impressions_prev) * 100 if impressions_prev > 0 else 0
+            if abs(pct) > 7:
                 icon = "🟢" if pct > 0 else "🔴"
-                bullet_points.append(f"{icon} Fill Rate {'up' if pct>0 else 'down'} by {abs(pct):.1f} pts")
+                bullet_points.append(f"{icon} Impressions {'increased' if pct>0 else 'decreased'} by {abs(int(pct)):,}%")
 
-    # CPM
-    if 'CPM' in last_data and 'CPM' in prev_data:
-        cpm_last = last_data['CPM'].mean()
-        cpm_prev = prev_data['CPM'].mean()
-        if not np.isnan(cpm_last) and not np.isnan(cpm_prev):
-            pct = ((cpm_last - cpm_prev) / cpm_prev * 100) if cpm_prev else 0
-            if abs(pct) > 5:
-                icon = "🟢" if pct > 0 else "🔴"
-                bullet_points.append(f"{icon} CPM {'rose' if pct>0 else 'dropped'} by {abs(int(pct))}%")
+        # Fill Rate
+        if 'Fill Rate' in last_data and 'Fill Rate' in prev_data:
+            fill_last = last_data['Fill Rate'].mean()
+            fill_prev = prev_data['Fill Rate'].mean()
+            if not np.isnan(fill_last) and not np.isnan(fill_prev):
+                pct = fill_last - fill_prev
+                if abs(pct) > 2:
+                    icon = "🟢" if pct > 0 else "🔴"
+                    bullet_points.append(f"{icon} Fill Rate {'up' if pct>0 else 'down'} by {abs(pct):,.1f} pts")
 
-    # RPM
-    if 'RPM' in last_data and 'RPM' in prev_data:
-        rpm_last = last_data['RPM'].mean()
-        rpm_prev = prev_data['RPM'].mean()
-        if not np.isnan(rpm_last) and not np.isnan(rpm_prev):
-            pct = ((rpm_last - rpm_prev) / rpm_prev * 100) if rpm_prev else 0
-            if abs(pct) > 5:
-                icon = "🟢" if pct > 0 else "🔴"
-                bullet_points.append(f"{icon} RPM {'up' if pct>0 else 'down'} by {abs(int(pct))}%")
+        # CPM
+        if 'CPM' in last_data and 'CPM' in prev_data:
+            cpm_last = last_data['CPM'].mean()
+            cpm_prev = prev_data['CPM'].mean()
+            if not np.isnan(cpm_last) and not np.isnan(cpm_prev):
+                pct = ((cpm_last - cpm_prev) / cpm_prev * 100) if cpm_prev else 0
+                if abs(pct) > 5:
+                    icon = "🟢" if pct > 0 else "🔴"
+                    bullet_points.append(f"{icon} CPM {'rose' if pct>0 else 'dropped'} by {abs(int(pct)):,}%")
 
-    # --- Non-obvious/invented examples ---
-    if pkg == "com.block.game.jigsaw.puzzles":
-        bullet_points.append("🔴 Revenue drop is driven by a spike in IVT (invalid traffic) detected, causing blocks by demand partners.")
-    if pkg == "com.goods.master3d.triple.puzzle":
-        bullet_points.append("🔴 A sudden shift to lower-yield ad formats this week reduced overall eCPM, despite stable demand.")
-    if pkg == "games.unmobil.found.it":
-        bullet_points.append("🟢 New in-app event increased ad engagement, raising Fill Rate and CPM.")
-    if pkg == "com.play.simple.wordsearch":
-        bullet_points.append("🔴 Fill Rate stable, but sudden drop in requests from Tier 1 GEOs impacted total revenue.")
-    if pkg == "com.vottzapps.wordle":
-        bullet_points.append("🔴 Margin dropped as demand shifted to lower-value channels (ex: more display, less video).")
-    if pkg == "com.easybrain.nonogram":
-        bullet_points.append("🟢 Package was whitelisted by a new DSP, adding incremental spend.")
+        # RPM
+        if 'RPM' in last_data and 'RPM' in prev_data:
+            rpm_last = last_data['RPM'].mean()
+            rpm_prev = prev_data['RPM'].mean()
+            if not np.isnan(rpm_last) and not np.isnan(rpm_prev):
+                pct = ((rpm_last - rpm_prev) / rpm_prev * 100) if rpm_prev else 0
+                if abs(pct) > 5:
+                    icon = "🟢" if pct > 0 else "🔴"
+                    bullet_points.append(f"{icon} RPM {'up' if pct>0 else 'down'} by {abs(int(pct)):,}%")
 
-    # If no other bullets, show a generic note
-    if not bullet_points:
-        bullet_points.append("No significant metric change detected.")
+        # Non-obvious/invented examples
+        if pkg == "com.block.game.jigsaw.puzzles":
+            bullet_points.append("🔴 Revenue drop is driven by a spike in IVT (invalid traffic) detected, causing blocks by demand partners.")
+        if pkg == "com.goods.master3d.triple.puzzle":
+            bullet_points.append("🔴 A sudden shift to lower-yield ad formats this week reduced overall eCPM, despite stable demand.")
+        if pkg == "games.unmobil.found.it":
+            bullet_points.append("🟢 New in-app event increased ad engagement, raising Fill Rate and CPM.")
+        if pkg == "com.play.simple.wordsearch":
+            bullet_points.append("🔴 Fill Rate stable, but sudden drop in requests from Tier 1 GEOs impacted total revenue.")
+        if pkg == "com.vottzapps.wordle":
+            bullet_points.append("🔴 Margin dropped as demand shifted to lower-value channels (ex: more display, less video).")
+        if pkg == "com.easybrain.nonogram":
+            bullet_points.append("🟢 Package was whitelisted by a new DSP, adding incremental spend.")
 
-    # --- Show in clean block ---
-    st.markdown(f"""
+        if not bullet_points:
+            bullet_points.append("No significant metric change detected.")
+
+        st.markdown(f"""
 **{trend_icon} {pkg}**
-- **Revenue {'Up' if change>0 else 'Down'} {abs(int(change))}%** (from {int(prev_rev)} to {int(last_rev)}; Main format: {top_adformat})
+- **Revenue {'Up' if change>0 else 'Down'} {abs(int(change)):,}%** (from {format_int(prev_rev)} to {format_int(last_rev)}; Main format: {top_adformat})
 """)
-    for b in bullet_points:
-        st.markdown(f"  - {b}")
-    st.markdown("---")
+        for b in bullet_points:
+            st.markdown(f"  - {b}")
+        st.markdown("---")
