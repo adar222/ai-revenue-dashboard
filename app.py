@@ -175,3 +175,72 @@ for _, row in agg_drop.iterrows():
             use_container_width=True,
             hide_index=True
         )
+
+import openai
+
+st.markdown("---")
+st.subheader("🤖 Ask AI About Your Data")
+
+# --- Enter API key securely ---
+api_key = st.text_input("Enter your OpenAI API key:", type="password")
+user_q = st.text_input("Type your question about a package, e.g.: 'Why did com.tripedot.woodoku drop?'")
+
+if api_key and user_q:
+    # Build a "context" string from your data for GPT
+    # Use trending/top 15 packages to keep context concise
+    trending_pkgs = merged.sort_values(f"Last 3d Revenue ({last_range})", ascending=False).head(15)['Package'].tolist()
+    context_rows = []
+    for pkg in trending_pkgs:
+        last = df[(df['Package'] == pkg) & (df['Date'].isin(last3d))]
+        prev = df[(df['Package'] == pkg) & (df['Date'].isin(prev3d))]
+        last_rev = last['Gross Revenue'].sum()
+        prev_rev = prev['Gross Revenue'].sum()
+        last_rpm = last['RPM'].mean() if 'RPM' in last.columns else None
+        prev_rpm = prev['RPM'].mean() if 'RPM' in prev.columns else None
+        last_cpm = last['CPM'].mean() if 'CPM' in last.columns else None
+        prev_cpm = prev['CPM'].mean() if 'CPM' in prev.columns else None
+        last_fill = last['Fill Rate'].mean() if 'Fill Rate' in last.columns else None
+        prev_fill = prev['Fill Rate'].mean() if 'Fill Rate' in prev.columns else None
+        row = f"""
+        Package: {pkg}
+        Last3d Revenue: {int(last_rev)}
+        Prev3d Revenue: {int(prev_rev)}
+        Last3d RPM: {last_rpm:.2f}  Prev3d RPM: {prev_rpm:.2f}
+        Last3d CPM: {last_cpm:.2f}  Prev3d CPM: {prev_cpm:.2f}
+        Last3d Fill Rate: {last_fill:.2f}  Prev3d Fill Rate: {prev_fill:.2f}
+        """
+        context_rows.append(row)
+    data_context = "\n".join(context_rows)
+
+    system_prompt = (
+        "You are an AI assistant for a programmatic revenue team. "
+        "You will receive questions from managers about why ad revenue changed for a given app/package. "
+        "You have context with historical performance data for the top packages. "
+        "Base your answers only on this context. If you don't know, say so. "
+        "Summarize key changes in metrics (RPM, CPM, Fill Rate, Requests, Impressions, etc) in bullet points. "
+        "Always use simple business language."
+    )
+
+    prompt = (
+        f"{system_prompt}\n\n"
+        f"DATA CONTEXT:\n{data_context}\n\n"
+        f"QUESTION: {user_q}\n\n"
+        "Give your answer in clear bullet points."
+    )
+
+    with st.spinner("Thinking..."):
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                api_key=api_key,
+                max_tokens=512,
+                temperature=0.3,
+            )
+            answer = response["choices"][0]["message"]["content"]
+            st.markdown(answer)
+        except Exception as e:
+            st.error(f"AI Error: {e}")
