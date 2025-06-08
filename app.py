@@ -15,13 +15,27 @@ df = pd.read_excel(uploaded_file)
 # --- Convert date to datetime ---
 df['Date'] = pd.to_datetime(df['Date'])
 
-# --- Trending Table: Per Package Only (Option 1) ---
+# --- Trending Table: Per Package Only, with Range and Status Icon ---
+
+def status_icon(val):
+    if str(val).lower() == "safe":
+        return "🟢 Safe"
+    if str(val).lower() == "needs review":
+        return "🟡 Needs Review"
+    if str(val).lower() == "critical":
+        return "🔴 Critical"
+    return "⚪️ N/A"
+
+# Build date ranges for column headers
+last_range = f"{last3d[0].strftime('%d/%m')}-{last3d[-1].strftime('%d/%m')}"
+prev_range = f"{prev3d[0].strftime('%d/%m')}-{prev3d[-1].strftime('%d/%m')}"
+
 def agg_3d_simple(period):
     return (
         df[df['Date'].isin(period)]
         .groupby('Package', as_index=False)['Gross Revenue']
         .sum()
-        .rename(columns={'Gross Revenue': f"Revenue_{period[-1].strftime('%m-%d')}"})
+        .rename(columns={'Gross Revenue': f"Last 3d Revenue ({last_range})" if period == last3d else f"Prev 3d Revenue ({prev_range})"})
     )
 
 last_agg = agg_3d_simple(last3d)
@@ -29,10 +43,10 @@ prev_agg = agg_3d_simple(prev3d)
 merged = pd.merge(
     last_agg, prev_agg, how='outer', on='Package'
 ).fillna(0)
-merged['Δ Amount'] = merged[last_agg.columns[-1]] - merged[prev_agg.columns[-1]]
+merged['Δ Amount'] = merged[f"Last 3d Revenue ({last_range})"] - merged[f"Prev 3d Revenue ({prev_range})"]
 merged['% Change'] = np.where(
-    merged[prev_agg.columns[-1]] > 0,
-    (merged[last_agg.columns[-1]] - merged[prev_agg.columns[-1]]) / merged[prev_agg.columns[-1]] * 100,
+    merged[f"Prev 3d Revenue ({prev_range})"] > 0,
+    (merged[f"Last 3d Revenue ({last_range})"] - merged[f"Prev 3d Revenue ({prev_range})"]) / merged[f"Prev 3d Revenue ({prev_range})"] * 100,
     100.0
 )
 # Status logic (take most recent in the last 3d period)
@@ -40,8 +54,17 @@ latest_status = (
     df[df['Date'].isin(last3d)][['Package', 'Status']]
     .drop_duplicates('Package', keep='last').set_index('Package')['Status']
 )
-merged['Status'] = merged['Package'].map(latest_status).fillna('-')
-merged = merged.sort_values(last_agg.columns[-1], ascending=False).head(10)
+merged['Status'] = merged['Package'].map(latest_status).fillna('-').apply(status_icon)
+merged = merged.sort_values(f"Last 3d Revenue ({last_range})", ascending=False).head(10)
+
+# Format and display
+ac_table = merged[['Package', f"Last 3d Revenue ({last_range})", f"Prev 3d Revenue ({prev_range})", 'Δ Amount', '% Change', 'Status']].copy()
+ac_table[f"Last 3d Revenue ({last_range})"] = ac_table[f"Last 3d Revenue ({last_range})"].apply(format_money)
+ac_table[f"Prev 3d Revenue ({prev_range})"] = ac_table[f"Prev 3d Revenue ({prev_range})"].apply(format_money)
+ac_table['Δ Amount'] = ac_table['Δ Amount'].apply(format_money)
+ac_table['% Change'] = ac_table['% Change'].apply(lambda x: f"{x:.0f}%")
+st.dataframe(ac_table, use_container_width=True)
+
 
 # Format and display
 ac_table = merged[['Package', last_agg.columns[-1], prev_agg.columns[-1], 'Δ Amount', '% Change', 'Status']].copy()
