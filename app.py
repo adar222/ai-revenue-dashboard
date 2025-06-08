@@ -31,6 +31,12 @@ def format_margin(val):
     except:
         return ""
 
+def format_pct(val):
+    try:
+        return f"{int(round(float(val)))}%"
+    except:
+        return ""
+
 def realtime_status(change):
     if -15 <= change <= 40:
         return "🟢 Safe"
@@ -90,9 +96,10 @@ ivt_margin = pd.concat([ivt_margin,
 ], ignore_index=True)
 ivt_margin['Alert'] = np.where(ivt_margin['Margin (%)'].astype(float) < 25, '❗ Low Margin',
                        np.where(ivt_margin['IVT (%)'].astype(float) > 15, '⚠️ High IVT', '✅ OK'))
+ivt_margin_table = ivt_margin[['Package', 'Gross Revenue', 'IVT (%)', 'Margin (%)', 'Alert']].copy()
 ivt_margin_table['Gross Revenue'] = ivt_margin_table['Gross Revenue'].apply(format_money)
 ivt_margin_table['Margin (%)'] = ivt_margin_table['Margin (%)'].apply(format_margin)
-ivt_margin_table['IVT (%)'] = ivt_margin_table['IVT (%)'].apply(lambda x: f"{int(round(float(x)))}%")
+ivt_margin_table['IVT (%)'] = ivt_margin_table['IVT (%)'].apply(format_pct)
 ivt_margin_table = ivt_margin_table.style.set_properties(subset=['Margin (%)', 'IVT (%)'], **{'text-align': 'center'})
 st.markdown("**a) Top 5 Grossing Packages:**")
 st.dataframe(ivt_margin_table, use_container_width=True, hide_index=True)
@@ -104,7 +111,8 @@ ivt_over_100['Alert'] = np.where(ivt_over_100['Margin (%)'] < 25, '❗ Low Margi
 ivt_over_100_table = ivt_over_100[['Package', 'Gross Revenue', 'IVT (%)', 'Margin (%)', 'Alert']].copy()
 ivt_over_100_table['Gross Revenue'] = ivt_over_100_table['Gross Revenue'].apply(format_money)
 ivt_over_100_table['Margin (%)'] = ivt_over_100_table['Margin (%)'].apply(format_margin)
-ivt_over_100_table = ivt_over_100_table.style.set_properties(subset=['Margin (%)'], **{'text-align': 'center'})
+ivt_over_100_table['IVT (%)'] = ivt_over_100_table['IVT (%)'].apply(format_pct)
+ivt_over_100_table = ivt_over_100_table.style.set_properties(subset=['Margin (%)', 'IVT (%)'], **{'text-align': 'center'})
 st.markdown("**b) Highest IVT for Packages Over $100:**")
 st.dataframe(ivt_over_100_table, use_container_width=True, hide_index=True)
 
@@ -116,7 +124,8 @@ if not new_pkg.empty:
     new_pkg_table = new_pkg[['Package', 'Gross Revenue', 'IVT (%)', 'Margin (%)', 'Ad format', 'Channel']].copy()
     new_pkg_table['Gross Revenue'] = new_pkg_table['Gross Revenue'].apply(format_money)
     new_pkg_table['Margin (%)'] = new_pkg_table['Margin (%)'].apply(format_margin)
-    new_pkg_table = new_pkg_table.style.set_properties(subset=['Margin (%)'], **{'text-align': 'center'})
+    new_pkg_table['IVT (%)'] = new_pkg_table['IVT (%)'].apply(format_pct)
+    new_pkg_table = new_pkg_table.style.set_properties(subset=['Margin (%)', 'IVT (%)'], **{'text-align': 'center'})
     st.dataframe(new_pkg_table, use_container_width=True, hide_index=True)
 
 # --- Revenue Drop Alert with Filter, Sort, Drilldown, Revenue in Expander Title ---
