@@ -11,11 +11,20 @@ if not uploaded_file:
     st.stop()
 
 df = pd.read_excel(uploaded_file)
-
-# --- Convert date to datetime ---
 df['Date'] = pd.to_datetime(df['Date'])
 
-# --- Trending Table: Per Package Only, with Range and Status Icon ---
+# --- Get sorted date array ---
+dates = sorted(df['Date'].unique())
+if len(dates) < 6:
+    st.warning("Need at least 6 days of data for 3d vs 3d comparison!")
+    st.stop()
+
+last3d = dates[-3:]
+prev3d = dates[-6:-3]
+
+# --- Formatters ---
+def format_money(val):
+    return f"${int(round(val))}"
 
 def status_icon(val):
     if str(val).lower() == "safe":
@@ -26,20 +35,20 @@ def status_icon(val):
         return "🔴 Critical"
     return "⚪️ N/A"
 
-# Build date ranges for column headers
+# --- Trending Table: Per Package Only, With Date Ranges and Icon ---
 last_range = f"{last3d[0].strftime('%d/%m')}-{last3d[-1].strftime('%d/%m')}"
 prev_range = f"{prev3d[0].strftime('%d/%m')}-{prev3d[-1].strftime('%d/%m')}"
 
-def agg_3d_simple(period):
+def agg_3d_simple(period, label):
     return (
         df[df['Date'].isin(period)]
         .groupby('Package', as_index=False)['Gross Revenue']
         .sum()
-        .rename(columns={'Gross Revenue': f"Last 3d Revenue ({last_range})" if period == last3d else f"Prev 3d Revenue ({prev_range})"})
+        .rename(columns={'Gross Revenue': label})
     )
 
-last_agg = agg_3d_simple(last3d)
-prev_agg = agg_3d_simple(prev3d)
+last_agg = agg_3d_simple(last3d, f"Last 3d Revenue ({last_range})")
+prev_agg = agg_3d_simple(prev3d, f"Prev 3d Revenue ({prev_range})")
 merged = pd.merge(
     last_agg, prev_agg, how='outer', on='Package'
 ).fillna(0)
@@ -49,7 +58,6 @@ merged['% Change'] = np.where(
     (merged[f"Last 3d Revenue ({last_range})"] - merged[f"Prev 3d Revenue ({prev_range})"]) / merged[f"Prev 3d Revenue ({prev_range})"] * 100,
     100.0
 )
-# Status logic (take most recent in the last 3d period)
 latest_status = (
     df[df['Date'].isin(last3d)][['Package', 'Status']]
     .drop_duplicates('Package', keep='last').set_index('Package')['Status']
@@ -57,29 +65,21 @@ latest_status = (
 merged['Status'] = merged['Package'].map(latest_status).fillna('-').apply(status_icon)
 merged = merged.sort_values(f"Last 3d Revenue ({last_range})", ascending=False).head(10)
 
-# Format and display
 ac_table = merged[['Package', f"Last 3d Revenue ({last_range})", f"Prev 3d Revenue ({prev_range})", 'Δ Amount', '% Change', 'Status']].copy()
 ac_table[f"Last 3d Revenue ({last_range})"] = ac_table[f"Last 3d Revenue ({last_range})"].apply(format_money)
 ac_table[f"Prev 3d Revenue ({prev_range})"] = ac_table[f"Prev 3d Revenue ({prev_range})"].apply(format_money)
 ac_table['Δ Amount'] = ac_table['Δ Amount'].apply(format_money)
 ac_table['% Change'] = ac_table['% Change'].apply(lambda x: f"{x:.0f}%")
+
+st.subheader("📊 Action Center: Top 10 Trending Packages")
+st.caption(f"(Last 3d: {last_range} vs Prev 3d: {prev_range})")
 st.dataframe(ac_table, use_container_width=True)
 
-
-# Format and display
-ac_table = merged[['Package', last_agg.columns[-1], prev_agg.columns[-1], 'Δ Amount', '% Change', 'Status']].copy()
-ac_table[last_agg.columns[-1]] = ac_table[last_agg.columns[-1]].apply(format_money)
-ac_table[prev_agg.columns[-1]] = ac_table[prev_agg.columns[-1]].apply(format_money)
-ac_table['Δ Amount'] = ac_table['Δ Amount'].apply(format_money)
-ac_table['% Change'] = ac_table['% Change'].apply(lambda x: f"{x:.0f}%")
-st.dataframe(ac_table, use_container_width=True)
-
-
-# --- 2. IVT & Margin Alert (Last Day) ---
+# --- IVT & Margin Alert (Last Day) ---
 latest_date = dates[-1]
 df_latest = df[df['Date'] == latest_date].copy()
-
 st.subheader(f"🛡️ IVT & Margin Alert (Last Day: {latest_date.strftime('%d/%m')})")
+
 # a) Top 5 grossing
 ivt_margin = df_latest.sort_values('Gross Revenue', ascending=False).head(5).copy()
 ivt_margin['Alert'] = np.where(ivt_margin['Margin (%)'] < 25, '❗ Low Margin',
@@ -98,7 +98,7 @@ ivt_over_100_table['Gross Revenue'] = ivt_over_100_table['Gross Revenue'].apply(
 st.markdown("**b) Highest IVT for Packages Over $100:**")
 st.dataframe(ivt_over_100_table, use_container_width=True)
 
-# --- 3. New Package Alert (over $100, first time seen) ---
+# --- New Package Alert (over $100, first time seen) ---
 seen_before = set(df[df['Date'] < latest_date]['Package'])
 new_pkg = df_latest[(~df_latest['Package'].isin(seen_before)) & (df_latest['Gross Revenue'] > 100)].copy()
 if not new_pkg.empty:
@@ -107,9 +107,8 @@ if not new_pkg.empty:
     new_pkg_table['Gross Revenue'] = new_pkg_table['Gross Revenue'].apply(format_money)
     st.dataframe(new_pkg_table, use_container_width=True)
 
-# --- 4. Revenue Drop Alert ---
+# --- Revenue Drop Alert ---
 st.subheader(f"⬇️ Revenue Drop Alert for {latest_date.strftime('%d/%m')} (Rev > $50, Drop > 15%)")
-# For each package, get previous day revenue
 prev_day = dates[-2]
 rev_drop = df_latest.set_index('Package')[['Gross Revenue', 'Ad format']].join(
     df[df['Date'] == prev_day].set_index('Package')['Gross Revenue'], rsuffix='_prev', how='left'
