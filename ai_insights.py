@@ -127,7 +127,11 @@ def show_ai_insights():
         margin_diff = row['Margin Yest'] - row['Margin Before']
         main_metric = None
         if abs(cpm_diff) > 0.04:
-            main_metric = f"CPM {'up' if cpm_diff > 0 else 'down'} {abs(cpm_diff)/row['CPM Before']*100:.0f}%"
+    if row['CPM Before'] != 0:
+        main_metric = f"CPM {'up' if cpm_diff > 0 else 'down'} {abs(cpm_diff)/row['CPM Before']*100:.0f}%"
+    else:
+        main_metric = f"CPM {'up' if cpm_diff > 0 else 'down'} (no previous value)"
+
         elif abs(fill_diff) > 0.02:
             main_metric = f"Fill {'up' if fill_diff > 0 else 'down'} {abs(fill_diff)*100:.1f} pts"
         elif abs(ivt_diff) > 2:
