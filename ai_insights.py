@@ -62,14 +62,15 @@ def generate_summary(total_diff, pct_diff, top_gainer, top_loser, df_up, df_down
 def ai_what_to_do(df_up, df_down):
     actions = []
     for row in df_down[:2]:
-        if row['IVT (%)'] > 10:
+        if row['IVT'] > 10:
             actions.append(
-                f"**Address IVT issues** for <b>{row['Package']}</b> (IVT {row['IVT (%)']:.1f}%). Consider filtering low-quality supply."
+                f"**Address IVT issues** for <b>{row['Package']}</b> (IVT {row['IVT']:.1f}%). Consider filtering low-quality supply."
             )
-        if row['Margin (%)'] < 20:
+        if row['Margin'] < 20:
             actions.append(
-                f"**Review low margin** on <b>{row['Package']}</b> (margin {row['Margin (%)']:.1f}%). Check pricing or creative blocks."
+                f"**Review low margin** on <b>{row['Package']}</b> (margin {row['Margin']:.1f}%). Check pricing or creative blocks."
             )
+    # ...rest of the function unchanged...
     for row in df_up[:2]:
         if row['CPM'] > 0.4:
             actions.append(
