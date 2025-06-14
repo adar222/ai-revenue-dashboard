@@ -1,115 +1,79 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 
-def safe_col(df, name):
-    for c in df.columns:
-        if c.strip().lower() == name.strip().lower():
-            return c
-    return None
-
-def ivt_alert_icon(ivt, margin):
-    if ivt > 10 and margin < 20:
-        return "🟥 Critical"
-    if ivt > 10:
-        return "🟠 High IVT"
-    if margin < 20:
-        return "🟠 Low Margin"
-    return "🟢 OK"
-
-def show_ivt_margin_alert(df):
-    package_col = safe_col(df, "Package")
-    ivt_col = safe_col(df, "IVT (%)")
-    margin_col = safe_col(df, "Margin (%)")
-    rpm_col = safe_col(df, "RPM")
-
-    # Use only the latest day
-    if 'Date' in df.columns:
-        df['Date'] = pd.to_datetime(df['Date'])
-        latest_day = df['Date'].max()
-        sub = df[df['Date'] == latest_day]
-    else:
-        sub = df
-
-    # Alert: IVT > 10% OR Margin < 20%
-    alert_df = sub[(sub[ivt_col] > 10) | (sub[margin_col] < 20)].copy()
-
-    alert_df[ivt_col] = alert_df[ivt_col].round(1)
-    alert_df[margin_col] = alert_df[margin_col].round(1)
-    alert_df[rpm_col] = alert_df[rpm_col].round(3)
-    alert_df["Alert"] = [ivt_alert_icon(ivt, margin) for ivt, margin in zip(alert_df[ivt_col], alert_df[margin_col])]
-
-    alert_df = alert_df.rename(columns={
-        package_col: "Package",
-        rpm_col: "RPM",
-        ivt_col: "IVT (%)",
-        margin_col: "Margin (%)"
-    })
-
-    st.markdown(
-        "<h5 style='margin-bottom:8px;'> <span style='font-size:1.2em;'>🛡️</span> <b>IVT & Margin Alert (Last Day)</b> </h5>",
-        unsafe_allow_html=True
-    )
-    st.write(
-        alert_df[["Package", "RPM", "IVT (%)", "Margin (%)", "Alert"]].to_html(escape=False, index=False),
-        unsafe_allow_html=True
-    )
-
-def score_icon(score):
-    # Adjust ranges as needed
-    if score >= 80:
-        return "🟢"
-    elif score >= 60:
-        return "🟡"
-    else:
-        return "🔴"
-
-def show_revenue_drop_table(df):
-    package_col = safe_col(df, "Package")
-    date_col = safe_col(df, "Date")
-    gross_col = safe_col(df, "Gross Revenue")
-    score_col = safe_col(df, "Score")
-
-    df[date_col] = pd.to_datetime(df[date_col])
-    last_dates = sorted(df[date_col].unique())[-2:]
-    if len(last_dates) < 2:
-        st.warning("Not enough data for revenue drop alert.")
+def show_ai_insights():
+    st.header("🧠 AI Insights — Top 15 Packages Revenue Trends")
+    uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
+    if not uploaded_file:
+        st.info("Please upload an Excel file to see AI insights.")
         return
 
-    last_day, prev_day = last_dates[-1], last_dates[-2]
+    df = pd.read_excel(uploaded_file)
+    if "Date" not in df.columns or "Package" not in df.columns or "Gross Revenue" not in df.columns:
+        st.error("Excel must have at least columns: Date, Package, Gross Revenue")
+        return
 
-    last_rev = df[df[date_col] == last_day].groupby(package_col)[gross_col].sum()
-    prev_rev = df[df[date_col] == prev_day].groupby(package_col)[gross_col].sum()
-    # If there are duplicates, group by package and use mean of score
-    if score_col and score_col in df.columns:
-        score_map = df[df[date_col] == last_day].groupby(package_col)[score_col].mean()
-    else:
-        score_map = pd.Series([None]*len(last_rev), index=last_rev.index)
+    df['Date'] = pd.to_datetime(df['Date'])
+    dates = sorted(df['Date'].unique())
+    if len(dates) < 6:
+        st.warning("Need at least 6 days of data for 3d vs 3d AI insights.")
+        return
 
-    result = pd.DataFrame({
-        "Last Day Rev": last_rev,
-        "Prev Day Rev": prev_rev,
-        "Score": score_map
-    }).fillna(0)
+    last3d = dates[-3:]
+    prev3d = dates[-6:-3]
+    last_range = f"{last3d[0].strftime('%d/%m')}-{last3d[-1].strftime('%d/%m')}"
+    prev_range = f"{prev3d[0].strftime('%d/%m')}-{prev3d[-1].strftime('%d/%m')}"
 
-    result["Δ"] = result["Last Day Rev"] - result["Prev Day Rev"]
-    result["% Drop"] = ((result["Δ"]) / result["Prev Day Rev"] * 100).round(0)
+    merged = pd.merge(
+        df[df['Date'].isin(last3d)].groupby('Package', as_index=False)['Gross Revenue'].sum().rename(columns={'Gross Revenue': f"Last 3d Revenue ({last_range})"}),
+        df[df['Date'].isin(prev3d)].groupby('Package', as_index=False)['Gross Revenue'].sum().rename(columns={'Gross Revenue': f"Prev 3d Revenue ({prev_range})"}),
+        how='outer', on='Package'
+    ).fillna(0)
 
-    # Only one row per package here!
-    alert_df = result[(result["Last Day Rev"] > 50) & (result["% Drop"] < -20)].copy()
-
-    # Formatting
-    alert_df["Last Day Rev"] = alert_df["Last Day Rev"].apply(lambda x: f"${int(round(x)):,}")
-    alert_df["Prev Day Rev"] = alert_df["Prev Day Rev"].apply(lambda x: f"${int(round(x)):,}")
-    alert_df["Δ"] = alert_df["Δ"].apply(lambda x: f"${int(round(x)):,}" if x < 0 else f"+${int(round(x)):,}")
-    alert_df["% Drop"] = alert_df["% Drop"].apply(lambda x: f"{int(round(x))}%")
-    alert_df["Score"] = alert_df["Score"].apply(lambda x: f"{int(x)} {score_icon(x)}" if pd.notna(x) else "N/A")
-    alert_df = alert_df.reset_index()
-
-    st.markdown(
-        "<h5 style='margin-bottom:8px;'> <span style='font-size:1.2em;'>📉</span> <b>Revenue Drop Alert (Rev > $50, >20%)</b> </h5>",
-        unsafe_allow_html=True
+    merged['Δ Amount'] = merged[f"Last 3d Revenue ({last_range})"] - merged[f"Prev 3d Revenue ({prev_range})"]
+    merged['% Change'] = np.where(
+        merged[f"Prev 3d Revenue ({prev_range})"] > 0,
+        (merged[f"Last 3d Revenue ({last_range})"] - merged[f"Prev 3d Revenue ({prev_range})"]) / merged[f"Prev 3d Revenue ({prev_range})"] * 100,
+        100.0
     )
-    st.write(
-        alert_df[["Package", "Last Day Rev", "Prev Day Rev", "Δ", "% Drop", "Score"]].to_html(escape=False, index=False),
-        unsafe_allow_html=True
-    )
+    merged = merged.sort_values('Δ Amount', ascending=True).reset_index(drop=True)
+
+    st.caption(f"(Last 3d: {last_range} vs Prev 3d: {prev_range})")
+    st.markdown("---")
+
+    # Show top 15 up/down with why bullets
+    for idx, row in merged.tail(8).iterrows():
+        pkg = row['Package']
+        change = row['% Change']
+        trend_icon = "🟢" if change > 0 else "🔴"
+
+        # Show the main trend line
+        st.markdown(f"""
+**{trend_icon} {pkg}**
+- **Revenue {'Up' if change > 0 else 'Down'} {abs(int(change)):,}%** (from {int(row[f'Prev 3d Revenue ({prev_range})'])} to {int(row[f'Last 3d Revenue ({last_range})'])})
+""")
+        # AI-style bullet points: Add more here as you add data fields (CPM, Fill Rate, IVT, etc)
+        last_data = df[(df['Package'] == pkg) & (df['Date'].isin(last3d))]
+        prev_data = df[(df['Package'] == pkg) & (df['Date'].isin(prev3d))]
+
+        bullets = []
+
+        for metric in ["CPM", "Fill Rate", "IVT (%)", "Margin (%)"]:
+            if metric in last_data.columns:
+                last_val = last_data[metric].mean()
+                prev_val = prev_data[metric].mean()
+                if not np.isnan(last_val) and not np.isnan(prev_val):
+                    pct = ((last_val - prev_val) / prev_val * 100) if prev_val else 0
+                    if abs(pct) > 7:  # show only significant moves
+                        icon = "🟢" if pct > 0 else "🔴"
+                        name = metric.replace(" (%)", "")
+                        bullets.append(f"{icon} {name} {'up' if pct>0 else 'down'} {abs(int(pct))}%")
+
+        if not bullets:
+            bullets.append("No significant metric change detected.")
+
+        for b in bullets:
+            st.markdown(f"  - {b}")
+
+        st.markdown("---")
