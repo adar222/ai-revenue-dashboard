@@ -127,7 +127,7 @@ def show_ai_insights():
         margin_diff = row['Margin Yest'] - row['Margin Before']
         main_metric = None
         if abs(cpm_diff) > 0.04:
-    if row['CPM Before'] != 0:
+        if row['CPM Before'] != 0:
         main_metric = f"CPM {'up' if cpm_diff > 0 else 'down'} {abs(cpm_diff)/row['CPM Before']*100:.0f}%"
     else:
         main_metric = f"CPM {'up' if cpm_diff > 0 else 'down'} (no previous value)"
