@@ -25,23 +25,13 @@ with st.sidebar:
         index=0
     )
 
-# --------- File upload handled ONLY in AI Insights ---------
-if "main_df" not in st.session_state:
-    st.session_state["main_df"] = None
-
 if tab == "AI Insights":
-    # The upload logic and DataFrame save should be inside show_ai_insights()
     show_ai_insights()
-else:
-    # For all other tabs, get the DataFrame from session state
-    df = st.session_state.get("main_df", None)
-    if df is None:
-        st.warning("Please upload your Excel file in the 'AI Insights' tab first.")
-    elif tab == "Dashboard":
-        show_dashboard(df)
-    elif tab == "IVT Optimization":
-        show_ivt_optimization(df)
-    elif tab == "RPM Optimization":
-        show_rpm_optimization(df)
-    elif tab == "Discrepancy Optimization":
-        show_discrepancy_optimization(df)
+elif tab == "Dashboard":
+    show_dashboard()
+elif tab == "IVT Optimization":
+    show_ivt_optimization()
+elif tab == "RPM Optimization":
+    show_rpm_optimization()
+elif tab == "Discrepancy Optimization":
+    show_discrepancy_optimization()
