@@ -25,16 +25,13 @@ with st.sidebar:
         index=0
     )
 
-# Always get the main DataFrame from session_state (or None if not loaded yet)
-df = st.session_state.get("main_df")
-
 if tab == "AI Insights":
     show_ai_insights()
 elif tab == "Dashboard":
-    show_dashboard(df)
+    show_dashboard()
 elif tab == "IVT Optimization":
-    show_ivt_optimization(df)
+    show_ivt_optimization()
 elif tab == "RPM Optimization":
-    show_rpm_optimization(df)
+    show_rpm_optimization()
 elif tab == "Discrepancy Optimization":
-    show_discrepancy_optimization(df)
+    show_discrepancy_optimization()
