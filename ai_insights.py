@@ -1,12 +1,11 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import openai
+import datetime
 
-# ==== HELPER FUNCTIONS ====
+# --- HELPER FUNCTIONS ---
 
 def color_arrow(change):
-    """Returns a colored up or down arrow for display."""
     if change > 0:
         return '<span style="color:green;font-size:1.2em;">↑</span>'
     elif change < 0:
@@ -14,10 +13,18 @@ def color_arrow(change):
     return ''
 
 def margin_icon(margin):
-    return "🟢" if margin >= 20 else "🟠"
+    try:
+        margin_val = float(margin)
+        return "🟢" if margin_val >= 20 else "🟠"
+    except:
+        return ""
 
 def ivt_icon(ivt):
-    return "🟢" if ivt <= 10 else "🟠"
+    try:
+        ivt_val = float(ivt)
+        return "🟢" if ivt_val <= 10 else "🟠"
+    except:
+        return ""
 
 def buyer_demo_picker(idx):
     buyers = ["LinkedIn", "DV360", "Amazon", "Criteo", "LinkedIn"]
@@ -87,21 +94,20 @@ def ai_what_to_do(df_up, df_down):
         )
     return actions
 
-# ==== MAIN FUNCTION ====
+# --- MAIN FUNCTION ---
 
 def show_ai_insights():
     st.header("🧠 AI Insights — Business Impact")
+    uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
-    # -- Upload Excel file (SHARED for all tabs)
-    uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"], key="ai_excel_upload")
-    if not uploaded_file:
+    if uploaded_file:
+        df = pd.read_excel(uploaded_file)
+        st.session_state["main_df"] = df  # SAVE TO SESSION STATE
+    elif "main_df" in st.session_state:
+        df = st.session_state["main_df"]
+    else:
         st.info("Please upload an Excel file to see AI insights.")
-        st.session_state['uploaded_df'] = None
         return
-
-    # Read excel and store in session_state
-    df = pd.read_excel(uploaded_file)
-    st.session_state['uploaded_df'] = df  # This makes it available for all tabs!
 
     required = {'Date', 'Package', 'Gross Revenue', 'eCPM', 'FillRate', 'Margin (%)', 'IVT (%)'}
     if not required.issubset(df.columns):
@@ -197,10 +203,7 @@ def show_ai_insights():
     pct_diff = (total_diff / total_rev_before * 100) if total_rev_before > 0 else 0
 
     # Generate summary & actions
-    summary = generate_summary(
-        total_diff, pct_diff, movers_up.iloc[0], movers_down.iloc[0], 
-        movers_up.to_dict('records'), movers_down.to_dict('records')
-    )
+    summary = generate_summary(total_diff, pct_diff, movers_up.iloc[0], movers_down.iloc[0], movers_up.to_dict('records'), movers_down.to_dict('records'))
     st.markdown(f"<h5><b>AI Revenue Overview — {yesterday.date()} vs {day_before.date()}</b></h5>", unsafe_allow_html=True)
     st.markdown(f"<div style='font-size:1.1em'>{summary}</div>", unsafe_allow_html=True)
     st.markdown("---")
@@ -227,12 +230,13 @@ def show_ai_insights():
     )
     st.markdown("---")
 
-    # AI Chatbot
+    # AI Chatbot (optional, needs openai package and API key)
     st.subheader("🤖 Ask AI About Your Data")
     api_key = st.text_input("Enter your OpenAI API key:", type="password")
     user_q = st.text_input("Type your question about a package, e.g.: 'Why did com.tripedot.woodoku drop?'")
     ask_button = st.button("Ask AI", key="ai_insights_chat")
     if api_key and user_q and ask_button:
+        import openai
         trending_pkgs = movers_up['Package'].tolist() + movers_down['Package'].tolist()
         context_rows = []
         for pkg in trending_pkgs:
@@ -289,3 +293,4 @@ Day Before Revenue: {int(prev_rev)}"""
                 st.markdown(answer)
             except Exception as e:
                 st.error(f"AI Error: {e}")
+
