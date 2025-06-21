@@ -4,6 +4,28 @@ import numpy as np
 import openai
 import datetime
 
+# ---------- HELPER FUNCTIONS GO FIRST ----------
+def color_arrow(change):
+    if change > 0:
+        return '<span style="color:green;font-size:1.2em;">↑</span>'
+    elif change < 0:
+        return '<span style="color:red;font-size:1.2em;">↓</span>'
+    return ''
+
+def margin_icon(margin):
+    return "🟢" if margin >= 20 else "🟠"
+
+def ivt_icon(ivt):
+    return "🟢" if ivt <= 10 else "🟠"
+
+# ... any other helper functions you use ...
+# (e.g., buyer_demo_picker, make_comment, generate_summary, ai_what_to_do, etc.)
+
+# ---------- THEN YOUR MAIN FUNCTION ----------
+def show_ai_insights():
+    # ... your logic ...
+    # now color_arrow is already defined, so no error!
+
 # ... (all your function definitions stay unchanged) ...
 
 def show_ai_insights():
