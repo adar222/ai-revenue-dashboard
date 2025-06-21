@@ -4,100 +4,28 @@ import numpy as np
 import openai
 import datetime
 
-def color_arrow(change):
-    if change > 0:
-        return '<span style="color:green;font-size:1.2em;">↑</span>'
-    elif change < 0:
-        return '<span style="color:red;font-size:1.2em;">↓</span>'
-    return ''
-
-def margin_icon(margin):
-    return "🟢" if margin >= 20 else "🟠"
-
-def ivt_icon(ivt):
-    return "🟢" if ivt <= 10 else "🟠"
-
-def buyer_demo_picker(idx):
-    buyers = ["LinkedIn", "DV360", "Amazon", "Criteo", "LinkedIn"]
-    return buyers[idx % len(buyers)]
-
-def make_comment(row):
-    if row['% Change'] > 18:
-        return "Scaling fast"
-    if row['% Change'] > 10:
-        return "Looks solid"
-    if row['% Change'] > 3:
-        return "Recovering"
-    if row['% Change'] < -18:
-        return "Losing buyer interest"
-    if row['% Change'] < -10:
-        return "Needs attention"
-    if row['% Change'] < -3:
-        return "At risk"
-    return "Stable"
-
-def generate_summary(total_diff, pct_diff, top_gainer, top_loser, df_up, df_down):
-    trend = "up" if total_diff > 0 else "down"
-    summary = (
-        f"Yesterday, overall account revenue was <b>{trend} by {abs(pct_diff):.1f}%</b> "
-        f"({'+' if total_diff > 0 else '-'}${abs(total_diff):,.0f}), led mainly by "
-        f"<b>{top_gainer['Package']}</b> ({color_arrow(top_gainer['Δ'])} ${abs(top_gainer['Δ']):,.0f}), due to {top_gainer['Reason'].lower()}. "
-    )
-    if len(df_up) > 1:
-        summary += (
-            f"Other strong risers included <b>{df_up[1]['Package']}</b> and <b>{df_up[2]['Package']}</b>, "
-            f"thanks to {df_up[1]['Reason'].lower()} and {df_up[2]['Reason'].lower()}. "
-        )
-    summary += (
-        f"On the downside, <b>{top_loser['Package']}</b> had the largest drop "
-        f"({color_arrow(top_loser['Δ'])} -${abs(top_loser['Δ']):,.0f}), with {top_loser['Reason'].lower()}."
-    )
-    if len(df_down) > 1:
-        summary += f" Other key drops: <b>{df_down[1]['Package']}</b> and <b>{df_down[2]['Package']}</b>."
-    summary += (
-        " Most gains came from higher CPM or fill rates, while most losses were linked to margin, IVT, or buyer shifts."
-    )
-    return summary
-
-def ai_what_to_do(df_up, df_down):
-    actions = []
-    for row in df_down[:2]:
-        if row['IVT'] > 10:
-            actions.append(
-                f"**Address IVT issues** for <b>{row['Package']}</b> (IVT {row['IVT']:.1f}%). Consider filtering low-quality supply."
-            )
-        if row['Margin'] < 20:
-            actions.append(
-                f"**Review low margin** on <b>{row['Package']}</b> (margin {row['Margin']:.1f}%). Check pricing or creative blocks."
-            )
-    # ...rest of the function unchanged...
-    for row in df_up[:2]:
-        if row['CPM'] > 0.4:
-            actions.append(
-                f"**Capitalize on CPM gains** for <b>{row['Package']}</b> by increasing supply to {row['Buyer']}."
-            )
-    actions.append(
-        "**Monitor declines** in packages showing consecutive drops (e.g., <b>{}</b>).".format(df_down[0]['Package'])
-    )
-    if any(row['Reason'].lower().find("fill") >= 0 for row in df_up):
-        actions.append(
-            "**Leverage video opportunity**—video engagement is driving revenue gains, especially for Amazon DSP buyers."
-        )
-    return actions
+# ... (all your function definitions stay unchanged) ...
 
 def show_ai_insights():
     st.header("🧠 AI Insights — Business Impact")
 
+    # This will persist your DataFrame for all tabs
     uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
-    if not uploaded_file:
+    if uploaded_file:
+        df = pd.read_excel(uploaded_file)
+        st.session_state["main_df"] = df  # Store globally for other tabs!
+    elif "main_df" in st.session_state and st.session_state["main_df"] is not None:
+        df = st.session_state["main_df"]
+    else:
         st.info("Please upload an Excel file to see AI insights.")
         return
 
-    df = pd.read_excel(uploaded_file)
     required = {'Date', 'Package', 'Gross Revenue', 'eCPM', 'FillRate', 'Margin (%)', 'IVT (%)'}
     if not required.issubset(df.columns):
         st.error("Excel must have columns: Date, Package, Gross Revenue, eCPM, FillRate, Margin (%), IVT (%)")
         return
+
+    # ...rest of your function remains unchanged...
 
     df['Date'] = pd.to_datetime(df['Date'])
     df = df.sort_values('Date')
