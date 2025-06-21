@@ -6,12 +6,14 @@ import openai
 def show_dashboard():
     st.title("📈 AI-Powered Revenue Action Center – Dashboard")
 
-    uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
-    if not uploaded_file:
-        st.info("Please upload an Excel file to view the dashboard.")
+    # Check for main_df in session state
+    if "main_df" not in st.session_state:
+        st.info("Please upload your Excel file in the AI Insights tab first.")
         return
 
-    df = pd.read_excel(uploaded_file)
+    df = st.session_state["main_df"]
+
+    # Date logic
     df['Date'] = pd.to_datetime(df['Date'])
     dates = sorted(df['Date'].unique())
     if len(dates) < 6:
@@ -72,10 +74,10 @@ def show_dashboard():
             prev_rev = prev['Gross Revenue'].sum()
             last_rpm = safe_mean(last['RPM']) if 'RPM' in last.columns else None
             prev_rpm = safe_mean(prev['RPM']) if 'RPM' in prev.columns else None
-            last_cpm = safe_mean(last['CPM']) if 'CPM' in last.columns else None
-            prev_cpm = safe_mean(prev['CPM']) if 'CPM' in prev.columns else None
-            last_fill = safe_mean(last['Fill Rate']) if 'Fill Rate' in last.columns else None
-            prev_fill = safe_mean(prev['Fill Rate']) if 'Fill Rate' in prev.columns else None
+            last_cpm = safe_mean(last['eCPM']) if 'eCPM' in last.columns else None
+            prev_cpm = safe_mean(prev['eCPM']) if 'eCPM' in prev.columns else None
+            last_fill = safe_mean(last['FillRate']) if 'FillRate' in last.columns else None
+            prev_fill = safe_mean(prev['FillRate']) if 'FillRate' in prev.columns else None
             row = f"""Package: {pkg}
 Last3d Revenue: {int(last_rev)}
 Prev3d Revenue: {int(prev_rev)}"""
