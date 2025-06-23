@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 
 def show_ivt_optimization():
-    # Step 1: Check for main_df. If missing, prompt to upload
+    # --- 1. Get Data ---
     df = st.session_state.get("main_df")
     if df is None or df.empty:
         st.warning("No data found in main_df. Please upload your data file below:")
@@ -15,77 +16,82 @@ def show_ivt_optimization():
             st.session_state["main_df"] = df
             st.success("File uploaded! Data is now available for analysis.")
         else:
-            st.stop()  # Stop here until a file is uploaded
-    else:
-        st.info("Using previously uploaded data. To reload, refresh the app or upload again in AI Insights tab.")
+            st.stop()
 
-    # ---- THE REST OF YOUR IVT OPTIMIZATION CODE GOES HERE ----
-    # For example, the user input/filtering code, etc.
-
-    days = st.number_input("Show data for last...", min_value=1, max_value=60, value=7)
+    # --- 2. User Inputs ---
+    days = st.number_input("Show data for last...", min_value=1, max_value=60, value=3)
     ivt_threshold = st.number_input("IVT Threshold (%)", min_value=0, max_value=100, value=10)
 
-    if 'date' in df.columns:
-        df['date'] = pd.to_datetime(df['date'], errors='coerce')
-        filtered_df = df[df['date'] >= (pd.Timestamp.today() - pd.Timedelta(days=days))]
+    # --- 3. Filter by date ---
+    if 'Date' in df.columns:
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        end_date = df['Date'].max()
+        start_date = end_date - pd.Timedelta(days=days-1)
+        filtered_df = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)]
     else:
-        filtered_df = df.copy()
+        st.error("Date column not found in your data!")
+        st.stop()
 
-    st.write("Columns in your data:", list(filtered_df.columns))
-    ivt_candidates = [col for col in filtered_df.columns if 'ivt' in col.lower() or 'invalid' in col.lower()]
+    # --- 4. Column selection for IVT ---
+    ivt_candidates = [col for col in filtered_df.columns if 'ivt' in col.lower()]
     if ivt_candidates:
         ivt_col = ivt_candidates[0]
-        st.success(f"Auto-selected IVT column: '{ivt_col}'")
     else:
         ivt_col = st.selectbox("Select IVT column", filtered_df.columns)
-
     if ivt_col not in filtered_df.columns:
-        st.error(f"Column '{ivt_col}' not found in data. Please check your data.")
-        return
+        st.error(f"Column '{ivt_col}' not found in data.")
+        st.stop()
 
-    filtered_df = filtered_df[filtered_df[ivt_col] >= ivt_threshold]
+    # --- 5. Aggregate by Product ID, Package, Campaign ID, Campaign Name ---
+    group_cols = ['Product', 'Package', 'Campaign ID', 'Campaign']  # Adjust these as per your data columns
+    agg_dict = {
+        'Requests': 'sum',
+        'Gross Revenue': 'sum',
+        ivt_col: ['mean', 'max']
+    }
 
-    if filtered_df.empty:
-        st.warning("No products found above the IVT threshold.")
-        return
+    # Only use columns that exist
+    group_cols = [col for col in group_cols if col in filtered_df.columns]
+    agg_dict = {k: v for k, v in agg_dict.items() if k in filtered_df.columns}
 
-    rename_dict = {}
-    if 'Product' in filtered_df.columns:
-        rename_dict['Product'] = 'Product ID'
-    if 'Pkg' in filtered_df.columns:
-        rename_dict['Pkg'] = 'Package'
-    if 'Campaign' in filtered_df.columns:
-        rename_dict['Campaign'] = 'Campaign'
-    rename_dict[ivt_col] = 'IVT %'
+    agg_df = filtered_df.groupby(group_cols, dropna=False).agg(agg_dict)
+    agg_df.columns = ['Requests', 'Gross Revenue', 'Avg IVT (%)', 'Max IVT (%)'][:len(agg_df.columns)]
+    agg_df = agg_df.reset_index()
 
-    rec_df = filtered_df.rename(columns=rename_dict)
-    if 'IVT %' in rec_df.columns:
-        rec_df['IVT %'] = rec_df['IVT %'].round(2)
+    # --- 6. Recommendation column ---
+    agg_df['Recommendation'] = np.where(
+        agg_df['Max IVT (%)'] >= ivt_threshold,
+        "🚩 Block at campaign level",
+        "✅ No action"
+    )
+    agg_df['Avg IVT (%)'] = agg_df['Avg IVT (%)'].round(2)
+    agg_df['Max IVT (%)'] = agg_df['Max IVT (%)'].round(2)
 
-    rec_df['Recommendation'] = rec_df['IVT %'].apply(
-        lambda x: "🚩 Block at campaign level" if x >= ivt_threshold else "✅ No action"
+    # --- 7. Table display ---
+    st.markdown("### 🏴 IVT Optimization Recommendations")
+    st.markdown(
+        f"**Data aggregated by Product, Package, Campaign ID, and Campaign**  \n"
+        f"**Period:** {start_date.date()} – {end_date.date()}"
     )
 
-    display_cols = [col for col in ['Product ID', 'Package', 'Campaign', 'IVT %', 'Recommendation'] if col in rec_df.columns]
-    rec_df = rec_df[display_cols]
-
+    display_cols = group_cols + ['Requests', 'Gross Revenue', 'Avg IVT (%)', 'Max IVT (%)', 'Recommendation']
     def highlight_ivt(val):
-        try:
-            color = 'red' if float(val) >= ivt_threshold else 'green'
-        except Exception:
-            color = 'white'
+        color = 'red' if val >= ivt_threshold else 'green'
         return f'background-color: {color}; color: white'
 
-    st.markdown("### 🏴 IVT Optimization Recommendations")
-    st.dataframe(
-        rec_df.style.applymap(highlight_ivt, subset=['IVT %']) if 'IVT %' in rec_df.columns else rec_df,
-        use_container_width=True,
-        hide_index=True
-    )
+    if not agg_df.empty:
+        st.dataframe(
+            agg_df.style.applymap(highlight_ivt, subset=['Max IVT (%)']),
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
+        st.info("No product-campaigns above the selected IVT threshold in this period.")
 
+    # --- 8. Download ---
     st.download_button(
         "Download Recommendations as CSV",
-        rec_df.to_csv(index=False),
+        agg_df.to_csv(index=False),
         file_name="ivt_recommendations.csv",
         mime="text/csv"
     )
