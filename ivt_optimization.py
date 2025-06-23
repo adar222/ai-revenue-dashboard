@@ -7,7 +7,7 @@ def show_ivt_optimization(df=None):
 
     # This tab must always get the df from session_state, unless directly provided
     if df is None:
-        df = st.session_state.get('df')
+        df = st.session_state.get('main_df')
     if df is None:
         st.info("Please upload your Excel file in the AI Insights tab.")
         return
