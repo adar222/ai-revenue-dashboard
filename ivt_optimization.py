@@ -67,33 +67,36 @@ def show_ivt_optimization():
         st.write("Aggregation dict:", agg_dict)
         st.stop()
 
-    # Flatten multiindex columns
+    # --- 6. Flatten multiindex columns and debug print ---
     def flatten_col(col):
         if isinstance(col, tuple):
             if col[1] == '':
                 return col[0]
             elif col[1] == 'mean':
-                return 'Avg IVT (%)'
+                return 'Avg IVT'
             elif col[1] == 'max':
-                return 'Max IVT (%)'
+                return 'Max IVT'
             else:
                 return f"{col[0]} {col[1]}"
         return col
     agg_df.columns = [flatten_col(c) for c in agg_df.columns]
     agg_df = agg_df.reset_index()
+    st.write("Aggregated columns for debug:", agg_df.columns.tolist())
 
-    if 'Max IVT (%)' not in agg_df.columns:
-        st.error(f"'Max IVT (%)' column missing after aggregation! Columns: {agg_df.columns.tolist()}")
+    # --- 7. Defensive: find actual column names dynamically ---
+    max_ivt_col = next((c for c in agg_df.columns if 'max' in c.lower() and 'ivt' in c.lower()), None)
+    avg_ivt_col = next((c for c in agg_df.columns if 'avg' in c.lower() and 'ivt' in c.lower()), None)
+    if not max_ivt_col:
+        st.error(f"No 'Max IVT' column found! Columns: {agg_df.columns.tolist()}")
         st.stop()
 
-    # Format IVT columns as integers with %
-    if 'Avg IVT (%)' in agg_df.columns:
-        agg_df['Avg IVT (%)'] = agg_df['Avg IVT (%)'].round(0).astype('Int64').astype(str) + '%'
-    agg_df['Max IVT (%)'] = agg_df['Max IVT (%)'].round(0).astype('Int64').astype(str) + '%'
+    # --- 8. Format columns ---
+    if avg_ivt_col:
+        agg_df[avg_ivt_col] = agg_df[avg_ivt_col].round(0).astype('Int64').astype(str) + '%'
+    agg_df[max_ivt_col] = agg_df[max_ivt_col].round(0).astype('Int64').astype(str) + '%'
 
-    # Recommendation column
-    max_ivt_numeric = filtered_df.groupby(group_cols)[ivt_col].max().reset_index()
-    agg_df['Max IVT Numeric'] = max_ivt_numeric[ivt_col].round(0).astype(int)
+    # Recommendation logic (using numeric for logic, not formatted string)
+    agg_df['Max IVT Numeric'] = agg_df[max_ivt_col].str.replace('%', '', regex=False).astype(float)
     agg_df['Recommendation'] = np.where(
         agg_df['Max IVT Numeric'] >= ivt_threshold,
         "🚩 Block product at campaign level",
@@ -102,6 +105,7 @@ def show_ivt_optimization():
 
     # Format Gross Revenue with $
     if 'Gross Revenue' in agg_df.columns:
+        agg_df['Gross Revenue'] = agg_df['Gross Revenue'].replace('[\$,]', '', regex=True).astype(float)
         agg_df['Gross Revenue'] = agg_df['Gross Revenue'].apply(lambda x: f"${int(round(x, 0)):,}")
 
     # Add "Check to Block" column (for demo, default False)
@@ -123,7 +127,10 @@ def show_ivt_optimization():
     )
 
     # Choose columns for display
-    display_cols = group_cols + ['Requests', 'Gross Revenue', 'Avg IVT (%)', 'Max IVT (%)', 'Recommendation', 'Check to Block']
+    display_cols = group_cols + ['Requests', 'Gross Revenue']
+    if avg_ivt_col:
+        display_cols.append(avg_ivt_col)
+    display_cols += [max_ivt_col, 'Recommendation', 'Check to Block']
     display_cols = [col for col in display_cols if col in agg_df.columns]
 
     # Color Max IVT text (not background)
@@ -135,10 +142,11 @@ def show_ivt_optimization():
         color = 'red' if val_numeric >= ivt_threshold else 'green'
         return f'color: {color}; font-weight: bold;'
 
-    # Use st.data_editor for checkboxes (only works Streamlit v1.22+)
     st.write("")
     st.write("")
     st.markdown("#### Recommendations Table")
+
+    # Use st.data_editor for checkboxes (Streamlit 1.22+)
     edited_df = st.data_editor(
         agg_df[display_cols],
         column_config={
@@ -151,13 +159,9 @@ def show_ivt_optimization():
         key="ivt_editor"
     )
 
-    # Apply Max IVT color
-    st.markdown("""
-    <style>
-    .st-emotion-cache-1e4glnm {font-weight: bold;}
-    </style>
-    """, unsafe_allow_html=True)
-    styled_df = edited_df.style.applymap(color_max_ivt, subset=['Max IVT (%)']) if 'Max IVT (%)' in edited_df.columns else edited_df
+    # Apply Max IVT color (styling just for display)
+    from pandas.io.formats.style import Styler
+    styled_df = edited_df.style.applymap(color_max_ivt, subset=[max_ivt_col]) if max_ivt_col in edited_df.columns else edited_df
     st.dataframe(styled_df, use_container_width=True, hide_index=True)
 
     # --- Download and Block Buttons ---
