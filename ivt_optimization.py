@@ -19,7 +19,7 @@ def show_ivt_optimization():
             st.stop()
 
     # --- 2. User Inputs ---
-    days = st.number_input("Show data for last...", min_value=1, max_value=60, value=3)
+    days = st.number_input("Show data for last... days", min_value=1, max_value=60, value=3)
     ivt_threshold = st.number_input("IVT Threshold (%)", min_value=0, max_value=100, value=10)
 
     # --- 3. Filter by date ---
@@ -32,6 +32,10 @@ def show_ivt_optimization():
         st.error("Date column not found in your data!")
         st.stop()
 
+    if filtered_df.empty:
+        st.info("No data in the selected date range.")
+        st.stop()
+
     # --- 4. Column selection for IVT ---
     ivt_candidates = [col for col in filtered_df.columns if 'ivt' in col.lower()]
     if ivt_candidates:
@@ -42,29 +46,48 @@ def show_ivt_optimization():
         st.error(f"Column '{ivt_col}' not found in data.")
         st.stop()
 
-    # --- 5. Aggregate by Product ID, Package, Campaign ID, Campaign Name ---
-    group_cols = ['Product', 'Package', 'Campaign ID', 'Campaign']  # Adjust these as per your data columns
-    agg_dict = {
-        'Requests': 'sum',
-        'Gross Revenue': 'sum',
-        ivt_col: ['mean', 'max']
-    }
+    # --- 5. Aggregate by Product ID, Package, Campaign ID, Campaign ---
+    group_cols = ['Product', 'Package', 'Campaign ID', 'Campaign']
+    agg_dict = {}
+    if 'Requests' in filtered_df.columns:
+        agg_dict['Requests'] = 'sum'
+    if 'Gross Revenue' in filtered_df.columns:
+        agg_dict['Gross Revenue'] = 'sum'
+    agg_dict[ivt_col] = ['mean', 'max']
 
     # Only use columns that exist
     group_cols = [col for col in group_cols if col in filtered_df.columns]
-    agg_dict = {k: v for k, v in agg_dict.items() if k in filtered_df.columns}
 
-    agg_df = filtered_df.groupby(group_cols, dropna=False).agg(agg_dict)
-    agg_df.columns = ['Requests', 'Gross Revenue', 'Avg IVT (%)', 'Max IVT (%)'][:len(agg_df.columns)]
+    try:
+        agg_df = filtered_df.groupby(group_cols, dropna=False).agg(agg_dict)
+    except Exception as e:
+        st.error(f"Aggregation error: {e}")
+        st.write("Group columns:", group_cols)
+        st.write("Aggregation dict:", agg_dict)
+        st.stop()
+
+    # Flatten multiindex columns if needed
+    agg_df.columns = [
+        "Requests" if c[0] == 'Requests' else
+        "Gross Revenue" if c[0] == 'Gross Revenue' else
+        "Avg IVT (%)" if c[1] == 'mean' else
+        "Max IVT (%)" if c[1] == 'max' else
+        c[0]
+        for c in agg_df.columns
+    ]
     agg_df = agg_df.reset_index()
 
     # --- 6. Recommendation column ---
+    if 'Max IVT (%)' not in agg_df.columns:
+        st.error(f"'Max IVT (%)' column missing after aggregation! Columns: {agg_df.columns.tolist()}")
+        st.stop()
     agg_df['Recommendation'] = np.where(
         agg_df['Max IVT (%)'] >= ivt_threshold,
         "🚩 Block at campaign level",
         "✅ No action"
     )
-    agg_df['Avg IVT (%)'] = agg_df['Avg IVT (%)'].round(2)
+    if 'Avg IVT (%)' in agg_df.columns:
+        agg_df['Avg IVT (%)'] = agg_df['Avg IVT (%)'].round(2)
     agg_df['Max IVT (%)'] = agg_df['Max IVT (%)'].round(2)
 
     # --- 7. Table display ---
@@ -75,8 +98,13 @@ def show_ivt_optimization():
     )
 
     display_cols = group_cols + ['Requests', 'Gross Revenue', 'Avg IVT (%)', 'Max IVT (%)', 'Recommendation']
+    display_cols = [col for col in display_cols if col in agg_df.columns]
+
     def highlight_ivt(val):
-        color = 'red' if val >= ivt_threshold else 'green'
+        try:
+            color = 'red' if float(val) >= ivt_threshold else 'green'
+        except:
+            color = 'white'
         return f'background-color: {color}; color: white'
 
     if not agg_df.empty:
@@ -91,7 +119,7 @@ def show_ivt_optimization():
     # --- 8. Download ---
     st.download_button(
         "Download Recommendations as CSV",
-        agg_df.to_csv(index=False),
+        agg_df[display_cols].to_csv(index=False),
         file_name="ivt_recommendations.csv",
         mime="text/csv"
     )
