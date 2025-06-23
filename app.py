@@ -5,7 +5,11 @@ from ivt_optimization import show_ivt_optimization
 from rpm_optimization import show_rpm_optimization
 from discrepancy_optimization import show_discrepancy_optimization
 
-st.set_page_config(page_title="AI Revenue Dashboard", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(
+    page_title="AI Revenue Dashboard",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 with st.sidebar:
     st.title("Navigation")
