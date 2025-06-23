@@ -18,8 +18,25 @@ if 'date' in df.columns:
 else:
     filtered_df = df.copy()
 
-# --- Filter by IVT threshold ---
-ivt_col = 'IVT' if 'IVT' in filtered_df.columns else 'ivt'
+# --- Print columns for debugging ---
+st.write("Columns in your DataFrame:", list(filtered_df.columns))
+
+# Try to auto-detect IVT column (case-insensitive)
+ivt_candidates = [col for col in filtered_df.columns if 'ivt' in col.lower() or 'invalid' in col.lower()]
+if ivt_candidates:
+    ivt_col = ivt_candidates[0]  # Take the first match
+else:
+    ivt_col = st.selectbox(
+        "Select IVT column",
+        filtered_df.columns,
+        help="Which column represents IVT %?"
+    )
+
+# --- Now continue filtering by IVT threshold ---
+if ivt_col not in filtered_df.columns:
+    st.error(f"Column '{ivt_col}' not found in data. Please check your data.")
+    st.stop()
+
 filtered_df = filtered_df[filtered_df[ivt_col] >= ivt_threshold]
 
 # --- Prepare recommendations DataFrame ---
