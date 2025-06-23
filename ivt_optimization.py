@@ -67,7 +67,7 @@ def show_ivt_optimization():
         st.write("Aggregation dict:", agg_dict)
         st.stop()
 
-    # --- 6. Flatten multiindex columns and debug print ---
+    # --- 6. Flatten multiindex columns ---
     def flatten_col(col):
         if isinstance(col, tuple):
             if col[1] == '':
@@ -81,7 +81,6 @@ def show_ivt_optimization():
         return col
     agg_df.columns = [flatten_col(c) for c in agg_df.columns]
     agg_df = agg_df.reset_index()
-    st.write("Aggregated columns for debug:", agg_df.columns.tolist())
 
     # --- 7. Defensive: find actual column names dynamically ---
     max_ivt_col = next((c for c in agg_df.columns if 'max' in c.lower() and 'ivt' in c.lower()), None)
@@ -100,7 +99,7 @@ def show_ivt_optimization():
     agg_df['Recommendation'] = np.where(
         agg_df['Max IVT Numeric'] >= ivt_threshold,
         "🚩 Block product at campaign level",
-        ""
+        "No action"
     )
 
     # Format Gross Revenue with $
@@ -119,7 +118,7 @@ def show_ivt_optimization():
     # Optional: show totals
     total_revenue = agg_df['Gross Revenue'].replace({'\$':'', ',':''}, regex=True).astype(float).sum() if 'Gross Revenue' in agg_df.columns else 0
     total_requests = agg_df['Requests'].sum() if 'Requests' in agg_df.columns else 0
-    flagged_count = (agg_df['Recommendation'] != "").sum()
+    flagged_count = (agg_df['Recommendation'] == "🚩 Block product at campaign level").sum()
     st.markdown(
         f"**Total Revenue:** ${total_revenue:,.0f}   "
         f"**Total Requests:** {int(total_requests):,}   "
@@ -142,8 +141,6 @@ def show_ivt_optimization():
         color = 'red' if val_numeric >= ivt_threshold else 'green'
         return f'color: {color}; font-weight: bold;'
 
-    st.write("")
-    st.write("")
     st.markdown("#### Recommendations Table")
 
     # Use st.data_editor for checkboxes (Streamlit 1.22+)
