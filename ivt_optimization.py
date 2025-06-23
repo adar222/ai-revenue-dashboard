@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 
 def show_ivt_optimization():
+    st.title("🏴 IVT Optimization Recommendations")
+
     # --- 1. Get Data ---
     df = st.session_state.get("main_df")
     if df is None or df.empty:
@@ -55,7 +57,6 @@ def show_ivt_optimization():
         agg_dict['Gross Revenue'] = 'sum'
     agg_dict[ivt_col] = ['mean', 'max']
 
-    # Only use columns that exist
     group_cols = [col for col in group_cols if col in filtered_df.columns]
 
     try:
@@ -66,60 +67,110 @@ def show_ivt_optimization():
         st.write("Aggregation dict:", agg_dict)
         st.stop()
 
-    # Flatten multiindex columns if needed
-    agg_df.columns = [
-        "Requests" if c[0] == 'Requests' else
-        "Gross Revenue" if c[0] == 'Gross Revenue' else
-        "Avg IVT (%)" if c[1] == 'mean' else
-        "Max IVT (%)" if c[1] == 'max' else
-        c[0]
-        for c in agg_df.columns
-    ]
+    # Flatten multiindex columns
+    def flatten_col(col):
+        if isinstance(col, tuple):
+            if col[1] == '':
+                return col[0]
+            elif col[1] == 'mean':
+                return 'Avg IVT (%)'
+            elif col[1] == 'max':
+                return 'Max IVT (%)'
+            else:
+                return f"{col[0]} {col[1]}"
+        return col
+    agg_df.columns = [flatten_col(c) for c in agg_df.columns]
     agg_df = agg_df.reset_index()
 
-    # --- 6. Recommendation column ---
     if 'Max IVT (%)' not in agg_df.columns:
         st.error(f"'Max IVT (%)' column missing after aggregation! Columns: {agg_df.columns.tolist()}")
         st.stop()
-    agg_df['Recommendation'] = np.where(
-        agg_df['Max IVT (%)'] >= ivt_threshold,
-        "🚩 Block at campaign level",
-        "✅ No action"
-    )
-    if 'Avg IVT (%)' in agg_df.columns:
-        agg_df['Avg IVT (%)'] = agg_df['Avg IVT (%)'].round(2)
-    agg_df['Max IVT (%)'] = agg_df['Max IVT (%)'].round(2)
 
-    # --- 7. Table display ---
-    st.markdown("### 🏴 IVT Optimization Recommendations")
+    # Format IVT columns as integers with %
+    if 'Avg IVT (%)' in agg_df.columns:
+        agg_df['Avg IVT (%)'] = agg_df['Avg IVT (%)'].round(0).astype('Int64').astype(str) + '%'
+    agg_df['Max IVT (%)'] = agg_df['Max IVT (%)'].round(0).astype('Int64').astype(str) + '%'
+
+    # Recommendation column
+    max_ivt_numeric = filtered_df.groupby(group_cols)[ivt_col].max().reset_index()
+    agg_df['Max IVT Numeric'] = max_ivt_numeric[ivt_col].round(0).astype(int)
+    agg_df['Recommendation'] = np.where(
+        agg_df['Max IVT Numeric'] >= ivt_threshold,
+        "🚩 Block product at campaign level",
+        ""
+    )
+
+    # Format Gross Revenue with $
+    if 'Gross Revenue' in agg_df.columns:
+        agg_df['Gross Revenue'] = agg_df['Gross Revenue'].apply(lambda x: f"${int(round(x, 0)):,}")
+
+    # Add "Check to Block" column (for demo, default False)
+    agg_df['Check to Block'] = False
+
+    # Display date range and summary
     st.markdown(
         f"**Data aggregated by Product, Package, Campaign ID, and Campaign**  \n"
         f"**Period:** {start_date.date()} – {end_date.date()}"
     )
+    # Optional: show totals
+    total_revenue = agg_df['Gross Revenue'].replace({'\$':'', ',':''}, regex=True).astype(float).sum() if 'Gross Revenue' in agg_df.columns else 0
+    total_requests = agg_df['Requests'].sum() if 'Requests' in agg_df.columns else 0
+    flagged_count = (agg_df['Recommendation'] != "").sum()
+    st.markdown(
+        f"**Total Revenue:** ${total_revenue:,.0f}   "
+        f"**Total Requests:** {int(total_requests):,}   "
+        f"**Flagged Products:** {flagged_count}"
+    )
 
-    display_cols = group_cols + ['Requests', 'Gross Revenue', 'Avg IVT (%)', 'Max IVT (%)', 'Recommendation']
+    # Choose columns for display
+    display_cols = group_cols + ['Requests', 'Gross Revenue', 'Avg IVT (%)', 'Max IVT (%)', 'Recommendation', 'Check to Block']
     display_cols = [col for col in display_cols if col in agg_df.columns]
 
-    def highlight_ivt(val):
+    # Color Max IVT text (not background)
+    def color_max_ivt(val):
         try:
-            color = 'red' if float(val) >= ivt_threshold else 'green'
-        except:
-            color = 'white'
-        return f'background-color: {color}; color: white'
+            val_numeric = int(val.strip('%'))
+        except Exception:
+            return ""
+        color = 'red' if val_numeric >= ivt_threshold else 'green'
+        return f'color: {color}; font-weight: bold;'
 
-    if not agg_df.empty:
-        st.dataframe(
-            agg_df.style.applymap(highlight_ivt, subset=['Max IVT (%)']),
-            use_container_width=True,
-            hide_index=True
-        )
-    else:
-        st.info("No product-campaigns above the selected IVT threshold in this period.")
+    # Use st.data_editor for checkboxes (only works Streamlit v1.22+)
+    st.write("")
+    st.write("")
+    st.markdown("#### Recommendations Table")
+    edited_df = st.data_editor(
+        agg_df[display_cols],
+        column_config={
+            "Check to Block": st.column_config.CheckboxColumn(
+                "Check to Block", help="Select products to block (demo only)"
+            )
+        },
+        hide_index=True,
+        use_container_width=True,
+        key="ivt_editor"
+    )
 
-    # --- 8. Download ---
+    # Apply Max IVT color
+    st.markdown("""
+    <style>
+    .st-emotion-cache-1e4glnm {font-weight: bold;}
+    </style>
+    """, unsafe_allow_html=True)
+    styled_df = edited_df.style.applymap(color_max_ivt, subset=['Max IVT (%)']) if 'Max IVT (%)' in edited_df.columns else edited_df
+    st.dataframe(styled_df, use_container_width=True, hide_index=True)
+
+    # --- Download and Block Buttons ---
     st.download_button(
         "Download Recommendations as CSV",
-        agg_df[display_cols].to_csv(index=False),
+        edited_df[display_cols].to_csv(index=False),
         file_name="ivt_recommendations.csv",
         mime="text/csv"
     )
+    if st.button("Block checked products (demo)"):
+        checked = edited_df[edited_df['Check to Block']]
+        st.success(f"Demo: {len(checked)} product-campaign(s) would be blocked.")
+
+    # Optional last updated timestamp
+    from datetime import datetime
+    st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
