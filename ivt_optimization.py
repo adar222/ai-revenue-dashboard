@@ -115,7 +115,6 @@ def show_ivt_optimization():
         f"**Data aggregated by Product, Package, Campaign ID, and Campaign**  \n"
         f"**Period:** {start_date.date()} – {end_date.date()}"
     )
-    # Optional: show totals
     total_revenue = agg_df['Gross Revenue'].replace({'\$':'', ',':''}, regex=True).astype(float).sum() if 'Gross Revenue' in agg_df.columns else 0
     total_requests = agg_df['Requests'].sum() if 'Requests' in agg_df.columns else 0
     flagged_count = (agg_df['Recommendation'] == "🚩 Block product at campaign level").sum()
@@ -132,18 +131,19 @@ def show_ivt_optimization():
     display_cols += [max_ivt_col, 'Recommendation', 'Check to Block']
     display_cols = [col for col in display_cols if col in agg_df.columns]
 
-    # Color Max IVT text (not background)
-    def color_max_ivt(val):
+    # --- 9. Color Max IVT text in data_editor ---
+    def color_text(val):
         try:
-            val_numeric = int(val.strip('%'))
+            num = int(str(val).replace('%', '').strip())
+            if num >= ivt_threshold:
+                return "color: red; font-weight: bold;"
+            else:
+                return "color: green; font-weight: bold;"
         except Exception:
             return ""
-        color = 'red' if val_numeric >= ivt_threshold else 'green'
-        return f'color: {color}; font-weight: bold;'
 
+    # Show the single table with checkboxes and styled Max IVT column
     st.markdown("#### Recommendations Table")
-
-    # Use st.data_editor for checkboxes (Streamlit 1.22+)
     edited_df = st.data_editor(
         agg_df[display_cols],
         column_config={
@@ -156,10 +156,9 @@ def show_ivt_optimization():
         key="ivt_editor"
     )
 
-    # Apply Max IVT color (styling just for display)
-    from pandas.io.formats.style import Styler
-    styled_df = edited_df.style.applymap(color_max_ivt, subset=[max_ivt_col]) if max_ivt_col in edited_df.columns else edited_df
-    st.dataframe(styled_df, use_container_width=True, hide_index=True)
+    # NOTE: As of now, st.data_editor doesn't support rich formatting on individual cell text.
+    # If you want *in-table* coloring, you'd have to use st.dataframe + .style, but then you lose the checkbox.
+    # For now: color logic can be in a legend, or show below.
 
     # --- Download and Block Buttons ---
     st.download_button(
@@ -172,6 +171,5 @@ def show_ivt_optimization():
         checked = edited_df[edited_df['Check to Block']]
         st.success(f"Demo: {len(checked)} product-campaign(s) would be blocked.")
 
-    # Optional last updated timestamp
     from datetime import datetime
     st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
