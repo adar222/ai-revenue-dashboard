@@ -1,29 +1,22 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
 def show_rpm_optimization():
     st.title("⚡ RPM Optimization")
 
-    # 1. Get DataFrame from session (change to your main session key if different)
     df = st.session_state.get("main_df")
     if df is None or df.empty:
         st.warning("No data found. Please upload data in the AI Insights tab first.")
         return
 
-    # 2. User Filters
+    # Filters
     rpm_threshold = st.number_input("Show products with RPM below:", min_value=0.0, value=0.05, step=0.01)
-    req_threshold = st.number_input("Show products with Requests NE higher than:", min_value=0, value=10000000, step=1000000)
+    req_threshold = st.number_input("Show products with Requests NE higher than:", min_value=0, value=10_000_000, step=1_000_000)
 
-    # 3. Column mapping to avoid case-sensitivity issues
+    # Mapping columns (edit as needed)
     col_map = {col.lower(): col for col in df.columns}
-    required_cols = ['campaign id', 'rpm', 'request ne', 'gross revenue', 'revenue cost']
-    missing = [col for col in required_cols if col not in [c.lower() for c in df.columns]]
-    if missing:
-        st.error(f"Missing columns in data: {', '.join(missing)}")
-        return
-
-    # 4. Prepare filtered data
     filtered = df.copy()
     filtered['Campaign ID'] = filtered[col_map['campaign id']]
     filtered['RPM'] = filtered[col_map['rpm']]
@@ -31,20 +24,20 @@ def show_rpm_optimization():
     filtered['Gross Revenue'] = filtered[col_map['gross revenue']]
     filtered['Revenue Cost'] = filtered[col_map['revenue cost']]
 
-    # Filter rows
+    # Apply filters
     filtered = filtered[(filtered['RPM'] < rpm_threshold) & (filtered['Request NE'] > req_threshold)].copy()
     if filtered.empty:
         st.info("No products match your filters.")
         return
 
-    # 5. Calculations
+    # Calculate serving costs & profitability
     filtered['Serving Costs'] = np.round(filtered['Request NE'] / 1_000_000_000 * 200).astype(int)
     filtered['Net Revenue After Serving Costs'] = filtered['Gross Revenue'] - filtered['Revenue Cost'] - filtered['Serving Costs']
     filtered['Profit/Loss Status'] = filtered['Net Revenue After Serving Costs'].apply(
         lambda x: "👍 Profitable" if x > 0 else "🚩 Losing money"
     )
 
-    # 6. Formatting for display (rounded, $ sign)
+    # Format columns for display
     filtered['Gross Revenue'] = filtered['Gross Revenue'].apply(lambda x: f"${int(round(x))}")
     filtered['Revenue Cost'] = filtered['Revenue Cost'].apply(lambda x: f"${int(round(x))}")
     filtered['Serving Costs'] = filtered['Serving Costs'].apply(lambda x: f"${int(round(x))}")
@@ -52,7 +45,6 @@ def show_rpm_optimization():
         lambda x: f"${int(round(x))}" if x >= 0 else f"-${abs(int(round(x)))}"
     )
 
-    # 7. Display table columns in correct order
     display_cols = [
         'Profit/Loss Status',
         'Campaign ID',
@@ -64,15 +56,22 @@ def show_rpm_optimization():
         'Net Revenue After Serving Costs',
     ]
 
-    # 8. Checkboxes for blocking (shown in a separate list, not inside st.dataframe)
-    checked = [st.checkbox(f"Block {row['Campaign ID']}", key=f"block_{idx}", label_visibility="collapsed") 
-               for idx, row in filtered.iterrows()]
-    filtered['Check to Block'] = checked
+    # AgGrid for inline checkboxes
+    gb = GridOptionsBuilder.from_dataframe(filtered[display_cols])
+    gb.configure_selection('multiple', use_checkbox=True)
+    grid_options = gb.build()
+    grid_return = AgGrid(
+        filtered[display_cols],
+        gridOptions=grid_options,
+        update_mode=GridUpdateMode.SELECTION_CHANGED,
+        fit_columns_on_grid_load=True,
+        height=400,
+        enable_enterprise_modules=False,
+    )
 
-    # 9. Show table (one single table, checkboxes on right)
-    st.dataframe(filtered[display_cols + ['Check to Block']], use_container_width=True, hide_index=True)
+    selected_rows = grid_return['selected_rows']
 
-    # 10. Download & Block Buttons
+    # Download & Bulk Block Buttons
     col1, col2 = st.columns(2)
     with col1:
         st.download_button(
@@ -82,9 +81,13 @@ def show_rpm_optimization():
             mime="text/csv",
         )
     with col2:
-        st.button("Block All Checked in Bulk")
+        if st.button("Block All Checked in Bulk"):
+            if selected_rows:
+                st.success(f"Blocking {len(selected_rows)} checked products.")
+            else:
+                st.warning("No products selected to block.")
 
-    # 11. AI Footer
+    # AI-driven insights in footer
     st.markdown("---")
     losing_count = (filtered['Profit/Loss Status'] == "🚩 Losing money").sum()
     st.subheader("🤖 AI Cost Efficiency Insights")
@@ -92,5 +95,3 @@ def show_rpm_optimization():
     st.write("• **Serving Costs:** $200 per 1B Requests.")
     st.write("• **Net Revenue After Serving Costs:** Gross Revenue – Revenue Cost – Serving Costs.")
     st.caption("_AI-powered insights: Optimize for true profitability!_")
-
-# --- END OF FUNCTION ---
