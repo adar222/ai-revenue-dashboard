@@ -5,7 +5,7 @@ import numpy as np
 def show_rpm_optimization():
     st.title("⚡ RPM Optimization")
 
-    # 1. Get DataFrame from session
+    # 1. Get DataFrame from session (change to your main session key if different)
     df = st.session_state.get("main_df")
     if df is None or df.empty:
         st.warning("No data found. Please upload data in the AI Insights tab first.")
@@ -44,7 +44,7 @@ def show_rpm_optimization():
         lambda x: "👍 Profitable" if x > 0 else "🚩 Losing money"
     )
 
-    # 6. Formatting for display
+    # 6. Formatting for display (rounded, $ sign)
     filtered['Gross Revenue'] = filtered['Gross Revenue'].apply(lambda x: f"${int(round(x))}")
     filtered['Revenue Cost'] = filtered['Revenue Cost'].apply(lambda x: f"${int(round(x))}")
     filtered['Serving Costs'] = filtered['Serving Costs'].apply(lambda x: f"${int(round(x))}")
@@ -52,6 +52,7 @@ def show_rpm_optimization():
         lambda x: f"${int(round(x))}" if x >= 0 else f"-${abs(int(round(x)))}"
     )
 
+    # 7. Display table columns in correct order
     display_cols = [
         'Profit/Loss Status',
         'Campaign ID',
@@ -63,20 +64,15 @@ def show_rpm_optimization():
         'Net Revenue After Serving Costs',
     ]
 
-    # 7. Add checkboxes for each row (outside table)
-    st.markdown("#### Products below thresholds")
-    checkboxes = []
-    for idx in filtered.index:
-        checkboxes.append(
-            st.checkbox("Block", key=f"block_{idx}", label_visibility="collapsed")
-        )
+    # 8. Checkboxes for blocking (shown in a separate list, not inside st.dataframe)
+    checked = [st.checkbox(f"Block {row['Campaign ID']}", key=f"block_{idx}", label_visibility="collapsed") 
+               for idx, row in filtered.iterrows()]
+    filtered['Check to Block'] = checked
 
-    filtered['Check to Block'] = checkboxes
-
-    # 8. Show table (hide index)
+    # 9. Show table (one single table, checkboxes on right)
     st.dataframe(filtered[display_cols + ['Check to Block']], use_container_width=True, hide_index=True)
 
-    # 9. Download & Block Buttons
+    # 10. Download & Block Buttons
     col1, col2 = st.columns(2)
     with col1:
         st.download_button(
@@ -88,8 +84,8 @@ def show_rpm_optimization():
     with col2:
         st.button("Block All Checked in Bulk")
 
+    # 11. AI Footer
     st.markdown("---")
-    # 10. AI Footer
     losing_count = (filtered['Profit/Loss Status'] == "🚩 Losing money").sum()
     st.subheader("🤖 AI Cost Efficiency Insights")
     st.write(f"• **{losing_count} products** are currently losing money due to high serving costs. Consider blocking them for better cost efficiency.")
@@ -97,5 +93,4 @@ def show_rpm_optimization():
     st.write("• **Net Revenue After Serving Costs:** Gross Revenue – Revenue Cost – Serving Costs.")
     st.caption("_AI-powered insights: Optimize for true profitability!_")
 
-# Uncomment if testing as a script
-# show_rpm_optimization()
+# --- END OF FUNCTION ---
