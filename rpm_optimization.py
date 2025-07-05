@@ -16,13 +16,15 @@ def show_rpm_optimization():
     req_threshold = st.number_input("Show products with Requests NE higher than:", min_value=0, value=10_000_000, step=1_000_000)
 
     # Mapping columns (edit as needed)
-    col_map = {col.lower(): col for col in df.columns}
-    filtered = df.copy()
-    filtered['Campaign ID'] = filtered[col_map['campaign id']]
-    filtered['RPM'] = filtered[col_map['rpm']]
-    filtered['Request NE'] = filtered[col_map['request ne']]
-    filtered['Gross Revenue'] = filtered[col_map['gross revenue']]
-    filtered['Revenue Cost'] = filtered[col_map['revenue cost']]
+   filtered['Request NE'] = filtered['Request NE'].apply(lambda x: f"{int(x):,}")
+filtered['RPM'] = filtered['RPM'].apply(lambda x: f"{x:.4f}")
+filtered['Gross Revenue'] = filtered['Gross Revenue'].apply(lambda x: f"${int(round(x))}")
+filtered['Revenue Cost'] = filtered['Revenue Cost'].apply(lambda x: f"${int(round(x))}")
+filtered['Serving Costs'] = filtered['Serving Costs'].apply(lambda x: f"${int(round(x))}")
+filtered['Net Revenue After Serving Costs'] = filtered['Net Revenue After Serving Costs'].apply(
+    lambda x: f"${int(round(x))}" if x >= 0 else f"-${abs(int(round(x)))}"
+)
+
 
     # Apply filters
     filtered = filtered[(filtered['RPM'] < rpm_threshold) & (filtered['Request NE'] > req_threshold)].copy()
