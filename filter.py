@@ -20,7 +20,11 @@ def show_filtering():
     uploaded_file = st.file_uploader("Upload a CSV or Excel file", type=["csv", "xlsx"])
 
     if uploaded_file is not None:
-        df = pd.read_csv(uploaded_file, sep=None, engine='python')
+        if uploaded_file is not None:
+            if uploaded_file.name.endswith(".csv"):
+                df = pd.read_csv(uploaded_file)
+            else:
+                df = pd.read_excel(uploaded_file)
 
         st.subheader("Original Data Preview")
         st.dataframe(df.head())
