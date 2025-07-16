@@ -23,7 +23,7 @@ with st.sidebar:
             "Dashboard",
             "IVT Optimization",
             "RPM Optimization",
-            "Discrepancy Optimization"
+            "Discrepancy Optimization",
             "Filtering low revenue and RPM",
             "Pubimps/advimps discrepancy",
             "IVT checker"
