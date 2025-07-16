@@ -17,7 +17,7 @@ def show_filtering():
     - Provide downloadable filtered CSV.
     """)
 
-    uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
+    uploaded_file = st.file_uploader("Upload a CSV or Excel file", type=["csv", "xlsx"])
 
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file, sep=None, engine='python')
