@@ -4,3 +4,4 @@ numpy
 openai
 openpyxl
 streamlit-aggrid
+plotly
