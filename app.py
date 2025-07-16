@@ -45,5 +45,5 @@ elif tab == "Pubimps/advimps discrepancy":
     show_pubimps()
 elif tab == "Filtering low revenue and RPM":
     show_filtering()
-elif page == "IVT checker":
+elif tab == "IVT checker":
     show_IVT()
