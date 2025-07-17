@@ -1,17 +1,9 @@
 import streamlit as st
-import pandas as pd
-
-# === Load Excel file once and share across the app ===
-EXCEL_FILE = "DemoAI.xlsx"
-
-if "main_df" not in st.session_state:
-    st.session_state["main_df"] = pd.read_excel(EXCEL_FILE)
-
+from home import show_home
 from ai_insights import show_ai_insights
 from dashboard import show_dashboard
 from ivt_optimization import show_ivt_optimization
 from rpm_optimization import show_rpm_optimization
-from filter import show_filtering
 from pubimps import show_pubimps
 
 st.set_page_config(
@@ -20,21 +12,26 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# --- Sidebar Navigation ---
 with st.sidebar:
     st.title("Navigation")
     tab = st.radio(
         "Go to:",
         options=[
+            "Home",
             "AI Insights",
             "Dashboard",
             "IVT Optimization",
             "RPM Optimization",
-                        "Pubimps/advimps discrepancy"
+            "Pubimps/advimps discrepancy"
         ],
         index=0
     )
 
-if tab == "AI Insights":
+# --- Tab Routing ---
+if tab == "Home":
+    show_home()
+elif tab == "AI Insights":
     show_ai_insights()
 elif tab == "Dashboard":
     show_dashboard()
