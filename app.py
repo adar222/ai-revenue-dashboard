@@ -12,7 +12,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- Sidebar Navigation ---
 with st.sidebar:
     st.title("Navigation")
     tab = st.radio(
@@ -28,7 +27,6 @@ with st.sidebar:
         index=0
     )
 
-# --- Tab Routing ---
 if tab == "Home":
     show_home()
 elif tab == "AI Insights":
