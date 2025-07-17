@@ -29,8 +29,7 @@ with st.sidebar:
             "Dashboard",
             "IVT Optimization",
             "RPM Optimization",
-            "Filtering low revenue and RPM",
-            "Pubimps/advimps discrepancy"
+                        "Pubimps/advimps discrepancy"
         ],
         index=0
     )
@@ -43,7 +42,5 @@ elif tab == "IVT Optimization":
     show_ivt_optimization()
 elif tab == "RPM Optimization":
     show_rpm_optimization()
-elif tab == "Filtering low revenue and RPM":
-    show_filtering()
 elif tab == "Pubimps/advimps discrepancy":
     show_pubimps()
