@@ -3,10 +3,10 @@ import pandas as pd
 
 # === Load Excel file once and share across the app ===
 EXCEL_FILE = "DemoAI.xlsx"
-
 if "main_df" not in st.session_state:
     st.session_state["main_df"] = pd.read_excel(EXCEL_FILE)
 
+from home import show_home         # <-- ADD this import!
 from ai_insights import show_ai_insights
 from dashboard import show_dashboard
 from ivt_optimization import show_ivt_optimization
@@ -25,6 +25,7 @@ with st.sidebar:
     tab = st.radio(
         "Go to:",
         options=[
+            "Home",
             "AI Insights",
             "Dashboard",
             "IVT Optimization",
@@ -34,7 +35,9 @@ with st.sidebar:
         index=0
     )
 
-if tab == "AI Insights":
+if tab == "Home":
+    show_home()           # <-- Show the homepage with cards/icons
+elif tab == "AI Insights":
     show_ai_insights()
 elif tab == "Dashboard":
     show_dashboard()
