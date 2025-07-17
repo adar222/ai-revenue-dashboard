@@ -1,4 +1,12 @@
 import streamlit as st
+import pandas as pd
+
+# === Load Excel file once and share across the app ===
+EXCEL_FILE = "DemoAI.xlsx"
+
+if "main_df" not in st.session_state:
+    st.session_state["main_df"] = pd.read_excel(EXCEL_FILE)
+
 from ai_insights import show_ai_insights
 from dashboard import show_dashboard
 from ivt_optimization import show_ivt_optimization
