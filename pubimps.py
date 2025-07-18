@@ -52,7 +52,7 @@ def show_pubimps():
     flagged_df['Advertiser Impressions'] = flagged_df['Advertiser Impressions'].apply(lambda x: f"{int(x):,}")
     flagged_df['Discrepancy %'] = flagged_df['Discrepancy'].apply(lambda x: f"{x:.2%}")
 
-    metric_cols = ['Publisher Impressions', 'Advertiser Impressions', 'Discrepancy %']
+    metric_cols = ['Publisher Impressions', 'Advertiser Impressions', 'Discrepancy %','Gross Revenue','Revenue Cost']
     display_cols = [col for col in dimension_cols if col in flagged_df.columns] + metric_cols
 
     if not flagged_df.empty:
