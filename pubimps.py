@@ -3,6 +3,7 @@ def show_pubimps():
     import pandas as pd
     import numpy as np
     from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+    import matplotlib.pyplot as plt
 
     st.title("📊 Impression Discrepancy Checker")
 
@@ -106,7 +107,7 @@ def show_pubimps():
         disabled=flagged_df.empty
     )
 
-    # --- Discrepancy Bracket Distribution Chart (Only discrepancy >= 0%) ---
+    # --- Discrepancy Bracket Distribution Pie Chart (Only discrepancy >= 0%) ---
     st.markdown("## Discrepancy Bracket Distribution (by Impressions, ≥0%)")
 
     bins = np.arange(0, 1.1, 0.1)  # 0% to 100% in 10% steps
@@ -125,10 +126,19 @@ def show_pubimps():
 
     bracket_df.rename(columns={'Advertiser Impressions': 'Total Impressions'}, inplace=True)
 
-    st.bar_chart(
-        bracket_df.set_index('Discrepancy Bracket')['Total Impressions'],
-        use_container_width=True
+    # PIE CHART
+    fig, ax = plt.subplots()
+    wedges, texts, autotexts = ax.pie(
+        bracket_df['Total Impressions'],
+        labels=bracket_df['Discrepancy Bracket'],
+        autopct=lambda pct: f"{pct:.1f}%" if pct > 0 else "",
+        startangle=90,
+        counterclock=False
     )
+    ax.axis('equal')
+    plt.setp(autotexts, size=10, weight="bold")
+    ax.set_title("Share of Impressions by Discrepancy Bracket", fontsize=14)
+    st.pyplot(fig)
     st.dataframe(bracket_df)
 
     # AI-driven insights in footer
