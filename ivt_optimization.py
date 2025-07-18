@@ -102,8 +102,8 @@ def show_ivt_optimization():
     )
 
     if 'Gross Revenue' in agg_df.columns:
-        agg_df['Gross Revenue'] = agg_df['Gross Revenue'].replace('[\$,]', '', regex=True).astype(float)
-        agg_df['Gross Revenue'] = agg_df['Gross Revenue'].apply(lambda x: f"${int(round(x, 0)):,}")
+        agg_df['Gross Revenue Numeric'] = agg_df['Gross Revenue'].replace('[\$,]', '', regex=True).astype(float)
+        agg_df['Gross Revenue'] = agg_df['Gross Revenue Numeric'].apply(lambda x: f"${int(round(x, 0)):,}")
 
     agg_df['Check to Block'] = False
 
@@ -113,23 +113,31 @@ def show_ivt_optimization():
         f"**Period:** {start_date.date()} – {end_date.date()}"
     )
 
-    total_revenue = agg_df['Gross Revenue'].replace({'\$':'', ',':''}, regex=True).astype(float).sum() if 'Gross Revenue' in agg_df.columns else 0
+    total_revenue = agg_df['Gross Revenue Numeric'].sum() if 'Gross Revenue Numeric' in agg_df.columns else 0
     total_requests = agg_df['Requests'].sum() if 'Requests' in agg_df.columns else 0
     flagged_count = (agg_df['Recommendation'] == "🚩 Block product at campaign level").sum()
 
-    # --- 10. Totals for filtered-out rows ---
+    # Filtered-out rows (below threshold)
     excluded_df = agg_df[agg_df['Max IVT Numeric'] < ivt_threshold]
-    excluded_revenue = excluded_df['Gross Revenue'].replace({'\$': '', ',': ''}, regex=True).astype(float).sum() if 'Gross Revenue' in excluded_df.columns else 0
+    excluded_revenue = excluded_df['Gross Revenue Numeric'].sum() if 'Gross Revenue Numeric' in excluded_df.columns else 0
     excluded_requests = excluded_df['Requests'].sum() if 'Requests' in excluded_df.columns else 0
 
-    st.markdown(
-        f"**Total Revenue:** ${total_revenue:,.0f}   "
-        f"**Total Requests:** {int(total_requests):,}   "
-        f"**Flagged Products:** {flagged_count}  \n"
-        f"**Filtered Out (Below Threshold):** Revenue ${excluded_revenue:,.0f}, Requests {int(excluded_requests):,}"
-    )
+    st.markdown("### 📋 Summary")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(
+            f"**Total Revenue:** ${total_revenue:,.0f}  \n"
+            f"**Total Requests:** {int(total_requests):,}  \n"
+            f"**Flagged Products:** {flagged_count}"
+        )
+    with col2:
+        st.markdown(
+            f"**Filtered-Out (Below {ivt_threshold}% IVT):**  \n"
+            f"Revenue: ${excluded_revenue:,.0f}  \n"
+            f"Requests: {int(excluded_requests):,}"
+        )
 
-    # --- 11. Display table ---
+    # --- 10. Display table ---
     display_cols = group_cols + ['Requests', 'Gross Revenue']
     if avg_ivt_col:
         display_cols.append(avg_ivt_col)
@@ -149,7 +157,7 @@ def show_ivt_optimization():
         key="ivt_editor"
     )
 
-    # --- 12. Download and actions ---
+    # --- 11. Download and actions ---
     st.download_button(
         "Download Recommendations as CSV",
         edited_df[display_cols].to_csv(index=False),
@@ -161,3 +169,4 @@ def show_ivt_optimization():
         st.success(f"Demo: {len(checked)} product-campaign(s) would be blocked.")
 
     st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
