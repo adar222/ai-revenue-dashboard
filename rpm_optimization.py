@@ -30,21 +30,24 @@ def show_rpm_optimization():
         st.info("No products match your filters.")
         return
 
-    # Calculate serving costs & profitability
+    # Calculate serving costs & profitability (numeric columns for all calculations)
     filtered['Serving Costs'] = np.round(filtered['Request NE'] / 1_000_000_000 * 200).astype(int)
-    filtered['Net Revenue After Serving Costs'] = filtered['Gross Revenue'] - filtered['Revenue Cost'] - filtered['Serving Costs']
+    filtered['Net Revenue After Serving Costs'] = (
+        filtered['Gross Revenue'] - filtered['Revenue Cost'] - filtered['Serving Costs']
+    )
     filtered['Profit/Loss Status'] = filtered['Net Revenue After Serving Costs'].apply(
         lambda x: "👍 Profitable" if x > 0 else "🚩 Losing money"
     )
 
-    # Format columns for display
-    filtered['Gross Revenue'] = filtered['Gross Revenue'].apply(lambda x: f"${int(round(x))}")
-    filtered['Revenue Cost'] = filtered['Revenue Cost'].apply(lambda x: f"${int(round(x))}")
-    filtered['Serving Costs'] = filtered['Serving Costs'].apply(lambda x: f"${int(round(x))}")
-    filtered['Net Revenue After Serving Costs'] = filtered['Net Revenue After Serving Costs'].apply(
-        lambda x: f"${int(round(x))}" if x >= 0 else f"-${abs(int(round(x)))}"
+    # Format columns for display only (keep original values for calculations)
+    filtered_display = filtered.copy()
+    filtered_display['Gross Revenue'] = filtered_display['Gross Revenue'].apply(lambda x: f"${int(round(x)):,}")
+    filtered_display['Revenue Cost'] = filtered_display['Revenue Cost'].apply(lambda x: f"${int(round(x)):,}")
+    filtered_display['Serving Costs'] = filtered_display['Serving Costs'].apply(lambda x: f"${int(round(x)):,}")
+    filtered_display['Net Revenue After Serving Costs'] = filtered_display['Net Revenue After Serving Costs'].apply(
+        lambda x: f"${int(round(x)):,}" if x >= 0 else f"-${abs(int(round(x))):,}"
     )
-    filtered['Request NE'] = filtered['Request NE'].apply(lambda x: f"{int(x):,}")
+    filtered_display['Request NE'] = filtered_display['Request NE'].apply(lambda x: f"{int(x):,}")
 
     display_cols = [
         'Profit/Loss Status',
@@ -58,7 +61,7 @@ def show_rpm_optimization():
     ]
 
     # AgGrid for inline checkboxes (center values + headers)
-    gb = GridOptionsBuilder.from_dataframe(filtered[display_cols])
+    gb = GridOptionsBuilder.from_dataframe(filtered_display[display_cols])
     gb.configure_selection('multiple', use_checkbox=True)
     for col in display_cols:
         gb.configure_column(
@@ -74,7 +77,7 @@ def show_rpm_optimization():
     }
 
     grid_return = AgGrid(
-        filtered[display_cols],
+        filtered_display[display_cols],
         gridOptions=grid_options,
         update_mode=GridUpdateMode.SELECTION_CHANGED,
         fit_columns_on_grid_load=True,
@@ -90,7 +93,7 @@ def show_rpm_optimization():
     with col1:
         st.download_button(
             label="Download to Excel",
-            data=filtered[display_cols].to_csv(index=False),
+            data=filtered_display[display_cols].to_csv(index=False),
             file_name="rpm_optimization.csv",
             mime="text/csv",
         )
@@ -111,7 +114,8 @@ def show_rpm_optimization():
     st.caption("_AI-powered insights: Optimize for true profitability!_")
 
     # === BIG BOLD RED SUMMARY FOR TOTAL LOSS ===
-    # For summary, use the unformatted numbers to get the total loss
+    # Calculate using NUMERIC columns only!
+    # Use the original, unfiltered df with the same logic to include all products
     filtered_numeric = df.copy()
     filtered_numeric['Serving Costs'] = np.round(filtered_numeric[col_map['request ne']] / 1_000_000_000 * 200).astype(int)
     filtered_numeric['Net Revenue After Serving Costs'] = (
