@@ -72,7 +72,7 @@ def show_pubimps():
 
     # Dynamically select all dimensions + metrics
     metric_cols = ['Publisher Impressions', 'Advertiser Impressions', 'Discrepancy %']
-    dimension_cols = [col for col in flagged_df.columns if col not in metric_cols + ['Discrepancy', 'Discrepancy Bin']]
+    dimension_cols = ['Date', 'Publisher', 'Campaign ID']  # Edit as needed
     display_cols = dimension_cols + metric_cols
 
     if not flagged_df.empty:
