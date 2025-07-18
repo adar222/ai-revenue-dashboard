@@ -109,3 +109,24 @@ def show_rpm_optimization():
     st.write("• **Serving Costs:** $200 per 1B Requests.")
     st.write("• **Net Revenue After Serving Costs:** Gross Revenue – Revenue Cost – Serving Costs.")
     st.caption("_AI-powered insights: Optimize for true profitability!_")
+
+    # === BIG BOLD RED SUMMARY FOR TOTAL LOSS ===
+    # For summary, use the unformatted numbers to get the total loss
+    filtered_numeric = df.copy()
+    filtered_numeric['Serving Costs'] = np.round(filtered_numeric[col_map['request ne']] / 1_000_000_000 * 200).astype(int)
+    filtered_numeric['Net Revenue After Serving Costs'] = (
+        filtered_numeric[col_map['gross revenue']] -
+        filtered_numeric[col_map['revenue cost']] -
+        filtered_numeric['Serving Costs']
+    )
+    total_loss = filtered_numeric.loc[
+        filtered_numeric['Net Revenue After Serving Costs'] < 0,
+        'Net Revenue After Serving Costs'
+    ].sum()
+    if total_loss < 0:
+        st.markdown(
+            f"<div style='font-size:28px; color:red; font-weight:bold;'>"
+            f"Total Loss from Negative Margin Products: -${abs(int(round(total_loss))):,}"
+            f"</div>",
+            unsafe_allow_html=True
+        )
