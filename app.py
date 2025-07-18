@@ -3,7 +3,6 @@ import pandas as pd
 
 st.set_page_config(page_title="AI Revenue Optimizer", layout="wide")
 
-# Excel loading
 EXCEL_FILE = "DemoAI.xlsx"
 if "main_df" not in st.session_state:
     st.session_state["main_df"] = pd.read_excel(EXCEL_FILE)
@@ -25,12 +24,7 @@ def go_to_tab(tab):
 # Sidebar
 with st.sidebar:
     st.markdown("## Navigation")
-    tab_choice = st.radio(
-        "Go to:",
-        TABS,
-        index=TABS.index(st.session_state["current_tab"]),
-        label_visibility="collapsed"
-    )
+    tab_choice = st.radio("Go to:", TABS, index=TABS.index(st.session_state["current_tab"]))
     if tab_choice != st.session_state["current_tab"]:
         go_to_tab(tab_choice)
         st.rerun()
@@ -42,36 +36,11 @@ def render_homepage():
         "</div>", unsafe_allow_html=True
     )
     cards = [
-        {
-            "tab": "AI Insights",
-            "icon": "🧠",
-            "title": "AI Insights",
-            "desc": "AI-powered recommendations and trends"
-        },
-        {
-            "tab": "Dashboard",
-            "icon": "📊",
-            "title": "Dashboard",
-            "desc": "All key revenue metrics at a glance"
-        },
-        {
-            "tab": "IVT Optimization",
-            "icon": "🚦",
-            "title": "IVT Optimization",
-            "desc": "Flag high IVT products & recommend action"
-        },
-        {
-            "tab": "RPM Optimization",
-            "icon": "⚡",
-            "title": "RPM Optimization",
-            "desc": "Spot low RPM and minimize losses"
-        },
-        {
-            "tab": "Pubimps/advimps discrepancy",
-            "icon": "🔍",
-            "title": "Pubimps/advimps discrepancy",
-            "desc": "Analyze publisher/advertiser impression gaps"
-        }
+        {"tab": "AI Insights", "icon": "🧠", "title": "AI Insights", "desc": "AI-powered recommendations and trends"},
+        {"tab": "Dashboard", "icon": "📊", "title": "Dashboard", "desc": "All key revenue metrics at a glance"},
+        {"tab": "IVT Optimization", "icon": "🚦", "title": "IVT Optimization", "desc": "Flag high IVT products & recommend action"},
+        {"tab": "RPM Optimization", "icon": "⚡", "title": "RPM Optimization", "desc": "Spot low RPM and minimize losses"},
+        {"tab": "Pubimps/advimps discrepancy", "icon": "🔍", "title": "Pubimps/advimps discrepancy", "desc": "Analyze publisher/advertiser impression gaps"}
     ]
     cols = st.columns(len(cards), gap="large")
     for idx, card in enumerate(cards):
@@ -115,7 +84,6 @@ def render_pubimps_discrepancy():
     st.header("Pubimps/advimps discrepancy")
     st.write("Analyze publisher/advertiser impression gaps.")
 
-# Tab Routing
 tab = st.session_state["current_tab"]
 if tab == "Home":
     render_homepage()
