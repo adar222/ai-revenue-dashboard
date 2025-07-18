@@ -8,7 +8,6 @@ def show_home():
         unsafe_allow_html=True
     )
 
-    # Define your cards
     cards = [
         {
             "icon": "🧠",
@@ -46,13 +45,13 @@ def show_home():
     for idx, card in enumerate(cards):
         with cols[idx]:
             if st.button(
-                f"{card['icon']} {card['title']}", 
-                key=f"card-btn-{card['tab']}", 
+                f"{card['icon']} {card['title']}",
+                key=f"card-btn-{card['tab']}",
                 help=card["desc"],
                 use_container_width=True
             ):
                 st.session_state["tab"] = card["tab"]
-                st.rerun()
+                st.rerun()  # <-- Use st.rerun, NOT st.experimental_rerun
             st.markdown(
                 f"""<div style="text-align: center; font-size: 0.98rem; color: #777;">{card['desc']}</div>""",
                 unsafe_allow_html=True
