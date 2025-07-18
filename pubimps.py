@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
 
 def show_pubimps():
     st.header("Pubimps/Advimps Discrepancy")
@@ -30,7 +29,7 @@ def show_pubimps():
         axis=1
     )
 
-    # Table (unchanged)
+    # Format for display
     df['Publisher Impressions_fmt'] = df['Publisher Impressions'].apply(lambda x: f"{int(x):,}")
     df['Advertiser Impressions_fmt'] = df['Advertiser Impressions'].apply(lambda x: f"{int(x):,}")
     df['Gross Revenue_fmt'] = df['Gross Revenue'].apply(lambda x: f"{int(x):,}")
@@ -65,39 +64,37 @@ def show_pubimps():
     st.subheader("All Products - Sort by Any Column")
     st.write(styler)
 
-    # --- Margin Bar Chart (only negative margin products, top 10 by Gross Revenue) ---
-    df_neg = df[df['Margin'] < 0].sort_values('Gross Revenue', ascending=False).head(10)
+    # --- Negative margin table ---
+    df_neg = df[df['Margin'] < 0].copy()
     if not df_neg.empty:
-        df_neg = df_neg.copy()
-        # Force Product to string so Plotly shows full ID, not 3M/4M etc
-        df_neg['Product'] = df_neg['Product'].astype(str)
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=df_neg['Product'],
-            y=df_neg['Margin'] * 100,  # Margin in percent
-            marker_color='red',
-            text=[f"{x:.1%}" for x in df_neg['Margin']],
-            textposition='outside',
-            # Make each bar the same width for categorical data
-            width=[0.6 for _ in range(len(df_neg))],
-            hovertemplate=(
-                "Product: %{x}<br>Margin: %{y:.1f}%<br>Gross Revenue: $%{customdata:,}<extra></extra>"
-            ),
-            customdata=df_neg['Gross Revenue'],
-        ))
+        df_neg['Publisher Impressions_fmt'] = df_neg['Publisher Impressions'].apply(lambda x: f"{int(x):,}")
+        df_neg['Advertiser Impressions_fmt'] = df_neg['Advertiser Impressions'].apply(lambda x: f"{int(x):,}")
+        df_neg['Gross Revenue_fmt'] = df_neg['Gross Revenue'].apply(lambda x: f"{int(x):,}")
+        df_neg['Revenue cost_fmt'] = df_neg['Revenue cost'].apply(lambda x: f"{int(x):,}")
+        df_neg['Impression Gap_fmt'] = df_neg['Impression Gap'].apply(lambda x: f"{int(x):,}")
+        df_neg['Margin_fmt'] = df_neg['Margin'].apply(lambda x: f"{x:.1%}")
 
-        fig.update_layout(
-            title="Top 10 Products with Negative Margin (%) by Gross Revenue",
-            xaxis_title="Product",
-            yaxis_title="Margin (%)",
-            yaxis=dict(tickformat=".0f", showgrid=True),
-            xaxis=dict(tickangle=-35, tickformat="none"),  # tickformat="none" disables 3M/4M abbreviations
-            margin=dict(l=60, r=10, t=50, b=80),
-            height=500,
-            bargap=0.05,  # Reduce gap to make bars thicker
+        df_neg_show = df_neg[show_cols].rename(columns={
+            'Publisher Impressions_fmt': 'Publisher Impressions',
+            'Advertiser Impressions_fmt': 'Advertiser Impressions',
+            'Gross Revenue_fmt': 'Gross Revenue',
+            'Revenue cost_fmt': 'Revenue cost',
+            'Margin_fmt': 'Margin',
+            'Impression Gap_fmt': 'Impression Gap'
+        })
+
+        neg_styler = df_neg_show.style.applymap(margin_color, subset=['Margin'])
+
+        st.subheader("Products with Negative Margin")
+        st.write(neg_styler)
+
+        # --- Summary: Total Loss ---
+        df_neg['Loss'] = df_neg['Gross Revenue'] - df_neg['Revenue cost']
+        total_loss = df_neg['Loss'].sum()
+        st.markdown(
+            f"<div style='font-size:22px;color:red;font-weight:bold;'>Total Loss from Negative Margin Products: ${total_loss:,.0f}</div>",
+            unsafe_allow_html=True
         )
-
-        st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("No products with negative margin found.")
 
