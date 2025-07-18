@@ -34,7 +34,7 @@ def show_pubimps():
         st.markdown("### Filter Data by Date")
         days = st.number_input(
             "Show data from the past X days",
-            min_value=1, max_value=365, value=30, step=1,
+            min_value=1, max_value=365, value=1, step=1,
         )
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         max_date = df['Date'].max()
@@ -50,6 +50,9 @@ def show_pubimps():
     # Calculate discrepancy
     df['Discrepancy'] = 1 - (df['Publisher Impressions'] / df['Advertiser Impressions'])
     df['Discrepancy Abs'] = df['Discrepancy'].abs()
+
+    # Only keep rows where discrepancy is 0% or above (ignore overdelivery)
+    df = df[df['Discrepancy'] >= 0].copy()
 
     # User sets the threshold as a percentage, default is 30%
     threshold_pct = st.number_input(
@@ -103,10 +106,10 @@ def show_pubimps():
         disabled=flagged_df.empty
     )
 
-    # --- Discrepancy Bracket Distribution Chart (Signed) ---
-    st.markdown("## Discrepancy Bracket Distribution (by Impressions)")
+    # --- Discrepancy Bracket Distribution Chart (Only discrepancy >= 0%) ---
+    st.markdown("## Discrepancy Bracket Distribution (by Impressions, ≥0%)")
 
-    bins = np.arange(-1.0, 1.1, 0.1)  # -100% to +100% in 10% steps
+    bins = np.arange(0, 1.1, 0.1)  # 0% to 100% in 10% steps
     labels = [f"{int(left*100)}% to {int(right*100)}%" for left, right in zip(bins[:-1], bins[1:])]
     df['Discrepancy Bracket'] = pd.cut(df['Discrepancy'], bins=bins, labels=labels, include_lowest=True, right=False)
 
