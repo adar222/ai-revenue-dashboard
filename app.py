@@ -22,18 +22,28 @@ st.set_page_config(
 
 with st.sidebar:
     st.title("Navigation")
-    tab = st.radio(
+tab_list = [
+    "Home",
+    "AI Insights",
+    "Dashboard",
+    "IVT Optimization",
+    "RPM Optimization",
+    "Pubimps/advimps discrepancy"
+]
+if "tab" not in st.session_state:
+    st.session_state["tab"] = "Home"
+
+with st.sidebar:
+    st.title("Navigation")
+    selected = st.radio(
         "Go to:",
-        options=[
-            "Home",
-            "AI Insights",
-            "Dashboard",
-            "IVT Optimization",
-            "RPM Optimization",
-            "Pubimps/advimps discrepancy"
-        ],
-        index=0
+        options=tab_list,
+        index=tab_list.index(st.session_state["tab"])
     )
+    st.session_state["tab"] = selected
+
+tab = st.session_state["tab"]
+
 
 if tab == "Home":
     show_home()           # <-- Show the homepage with cards/icons
