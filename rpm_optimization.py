@@ -115,7 +115,6 @@ def show_rpm_optimization():
 
     # === BIG BOLD RED SUMMARY FOR TOTAL LOSS ===
     # Calculate using NUMERIC columns only!
-    # Use the original, unfiltered df with the same logic to include all products
     filtered_numeric = df.copy()
     filtered_numeric['Serving Costs'] = np.round(filtered_numeric[col_map['request ne']] / 1_000_000_000 * 200).astype(int)
     filtered_numeric['Net Revenue After Serving Costs'] = (
@@ -130,7 +129,7 @@ def show_rpm_optimization():
     if total_loss < 0:
         st.markdown(
             f"<div style='font-size:28px; color:red; font-weight:bold;'>"
-            f"Total Loss from Negative Margin Products: -${abs(int(round(total_loss))):,}"
+            f"Total Loss from Negative Margin Products (after serving costs): -${abs(int(round(total_loss))):,}"
             f"</div>",
             unsafe_allow_html=True
         )
