@@ -33,8 +33,8 @@ def show_pubimps():
     if 'Date' in df.columns:
         st.markdown("### Filter Data by Date")
         days = st.number_input(
-            "Show data from the past X days (leave empty for all data)",
-            min_value=1, max_value=365, value=1, step=1,
+            "Show data from the past X days",
+            min_value=1, max_value=365, value=30, step=1,
         )
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         max_date = df['Date'].max()
@@ -103,32 +103,30 @@ def show_pubimps():
         disabled=flagged_df.empty
     )
 
-    # --- IVT Bracket Distribution Chart ---
-    st.markdown("## IVT Bracket Distribution (by Impressions)")
+    # --- Discrepancy Bracket Distribution Chart (Signed) ---
+    st.markdown("## Discrepancy Bracket Distribution (by Impressions)")
 
-    bins = np.arange(0, 1.1, 0.1)
-    labels = [f"{int(left*100)}–{int(right*100)}%" for left, right in zip(bins[:-1], bins[1:])]
-    df['IVT Bracket'] = pd.cut(df['Discrepancy Abs'], bins=bins, labels=labels, include_lowest=True, right=False)
+    bins = np.arange(-1.0, 1.1, 0.1)  # -100% to +100% in 10% steps
+    labels = [f"{int(left*100)}% to {int(right*100)}%" for left, right in zip(bins[:-1], bins[1:])]
+    df['Discrepancy Bracket'] = pd.cut(df['Discrepancy'], bins=bins, labels=labels, include_lowest=True, right=False)
 
     # Aggregate total impressions in each bracket
-    ivt_bracket_df = (
-        df.groupby('IVT Bracket')['Advertiser Impressions']
+    bracket_df = (
+        df.groupby('Discrepancy Bracket')['Advertiser Impressions']
         .sum()
         .reindex(labels, fill_value=0)
         .reset_index()
     )
+    total_imps = bracket_df['Advertiser Impressions'].sum()
+    bracket_df['% of Total'] = (bracket_df['Advertiser Impressions'] / total_imps * 100).round(2)
 
-    # Calculate percent of total for context
-    total_imps = ivt_bracket_df['Advertiser Impressions'].sum()
-    ivt_bracket_df['% of Total'] = (ivt_bracket_df['Advertiser Impressions'] / total_imps * 100).round(2)
-
-    ivt_bracket_df.rename(columns={'Advertiser Impressions': 'Total Impressions'}, inplace=True)
+    bracket_df.rename(columns={'Advertiser Impressions': 'Total Impressions'}, inplace=True)
 
     st.bar_chart(
-        ivt_bracket_df.set_index('IVT Bracket')['Total Impressions'],
+        bracket_df.set_index('Discrepancy Bracket')['Total Impressions'],
         use_container_width=True
     )
-    st.dataframe(ivt_bracket_df)
+    st.dataframe(bracket_df)
 
     # AI-driven insights in footer
     st.markdown("---")
