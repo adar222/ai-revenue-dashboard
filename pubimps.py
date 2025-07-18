@@ -22,7 +22,7 @@ def show_pubimps():
 
     # === Specify your dimension columns here ===
     dimension_cols = []
-    for col in ['Date', 'Publisher', 'Campaign ID']:
+    for col in ['Package', 'Channel', 'Campaign ID']:
         if col in df.columns:
             dimension_cols.append(col)
     # Add/remove from above list to match your file's dimension fields
