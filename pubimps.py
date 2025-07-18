@@ -29,6 +29,15 @@ def show_pubimps():
     df['Publisher Impressions'] = pd.to_numeric(df['Publisher Impressions'], errors='coerce')
     df['Advertiser Impressions'] = pd.to_numeric(df['Advertiser Impressions'], errors='coerce')
 
+    # Add gross revenue and revenue cost if they exist
+    extra_metric_cols = []
+    if 'Gross Revenue' in df.columns:
+        df['Gross Revenue'] = pd.to_numeric(df['Gross Revenue'], errors='coerce').fillna(0)
+        extra_metric_cols.append('Gross Revenue')
+    if 'Revenue Cost' in df.columns:
+        df['Revenue Cost'] = pd.to_numeric(df['Revenue Cost'], errors='coerce').fillna(0)
+        extra_metric_cols.append('Revenue Cost')
+
     # Avoid division by zero
     df = df[df['Advertiser Impressions'] > 0].copy()
 
@@ -36,7 +45,7 @@ def show_pubimps():
     df['Discrepancy'] = 1 - (df['Publisher Impressions'] / df['Advertiser Impressions'])
     df['Discrepancy Abs'] = df['Discrepancy'].abs()
 
-    # User sets the threshold as a percentage
+    # User sets the threshold as a percentage, default is 30%
     threshold_pct = st.number_input(
         "Flag rows where absolute discrepancy is greater than (%)",
         min_value=0, max_value=100, value=30, step=1,
@@ -47,12 +56,17 @@ def show_pubimps():
     # Filter flagged rows by threshold
     flagged_df = df[df['Discrepancy Abs'] > threshold].copy()
 
-    # Format for display
+    # Format for display (no decimals)
     flagged_df['Publisher Impressions'] = flagged_df['Publisher Impressions'].apply(lambda x: f"{int(x):,}")
     flagged_df['Advertiser Impressions'] = flagged_df['Advertiser Impressions'].apply(lambda x: f"{int(x):,}")
     flagged_df['Discrepancy %'] = flagged_df['Discrepancy'].apply(lambda x: f"{x:.2%}")
+    if 'Gross Revenue' in flagged_df.columns:
+        flagged_df['Gross Revenue'] = flagged_df['Gross Revenue'].apply(lambda x: f"{int(round(x)):,}")
+    if 'Revenue Cost' in flagged_df.columns:
+        flagged_df['Revenue Cost'] = flagged_df['Revenue Cost'].apply(lambda x: f"{int(round(x)):,}")
 
-    metric_cols = ['Publisher Impressions', 'Advertiser Impressions', 'Discrepancy %','Gross Revenue','Revenue Cost']
+    # Display columns: dimensions + always metrics + extras if present
+    metric_cols = ['Publisher Impressions', 'Advertiser Impressions', 'Discrepancy %'] + extra_metric_cols
     display_cols = [col for col in dimension_cols if col in flagged_df.columns] + metric_cols
 
     if not flagged_df.empty:
@@ -87,6 +101,14 @@ def show_pubimps():
         mime="text/csv",
         disabled=flagged_df.empty
     )
+
+    # Metrics/sum for Gross Revenue and Revenue Cost
+    if not flagged_df.empty and 'Gross Revenue' in df.columns and 'Revenue Cost' in df.columns:
+        # Use unformatted for sum (need to access numeric, not formatted string)
+        gross_sum = df.loc[df['Discrepancy Abs'] > threshold, 'Gross Revenue'].sum()
+        cost_sum = df.loc[df['Discrepancy Abs'] > threshold, 'Revenue Cost'].sum()
+        st.metric("Total Gross Revenue (flagged)", f"${int(round(gross_sum)):,}")
+        st.metric("Total Revenue Cost (flagged)", f"${int(round(cost_sum)):,}")
 
     # AI-driven insights in footer
     st.markdown("---")
