@@ -57,10 +57,13 @@ def show_rpm_optimization():
         'Net Revenue After Serving Costs',
     ]
 
-    # AgGrid for inline checkboxes
+    # AgGrid for inline checkboxes (now with center alignment)
     gb = GridOptionsBuilder.from_dataframe(filtered[display_cols])
     gb.configure_selection('multiple', use_checkbox=True)
+    for col in display_cols:
+        gb.configure_column(col, cellStyle={'textAlign': 'center'})
     grid_options = gb.build()
+
     grid_return = AgGrid(
         filtered[display_cols],
         gridOptions=grid_options,
