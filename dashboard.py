@@ -37,7 +37,7 @@ def show_dashboard():
         how='outer', on='Package'
     ).fillna(0)
 
-    merged['Δ Gross Revenue'] = merged[f"Last 3d Revenue ({last_range})"] - merged[f"Prev 3d Revenue ({prev_range})"]
+    merged['Δ Gross Revenue Change'] = merged[f"Last 3d Revenue ({last_range})"] - merged[f"Prev 3d Revenue ({prev_range})"]
     merged['% Change'] = np.where(
         merged[f"Prev 3d Revenue ({prev_range})"] > 0,
         (merged[f"Last 3d Revenue ({last_range})"] - merged[f"Prev 3d Revenue ({prev_range})"]) / merged[f"Prev 3d Revenue ({prev_range})"] * 100,
@@ -45,15 +45,33 @@ def show_dashboard():
     )
     merged = merged.sort_values(f"Last 3d Revenue ({last_range})", ascending=False).head(15)
 
-    ac_table = merged[['Package', f"Last 3d Revenue ({last_range})", f"Prev 3d Revenue ({prev_range})", 'Δ Gross Revenue', '% Change']].copy()
+    ac_table = merged[['Package', f"Last 3d Revenue ({last_range})", f"Prev 3d Revenue ({prev_range})", 'Δ Gross Revenue Change', '% Change']].copy()
     ac_table[f"Last 3d Revenue ({last_range})"] = ac_table[f"Last 3d Revenue ({last_range})"].apply(format_money)
     ac_table[f"Prev 3d Revenue ({prev_range})"] = ac_table[f"Prev 3d Revenue ({prev_range})"].apply(format_money)
-    ac_table['Δ Gross Revenue'] = ac_table['Δ Gross Revenue'].apply(format_money)
+    ac_table['Δ Gross Revenue Change Raw'] = merged['Δ Gross Revenue Change']  # Keep for styling
+    ac_table['Δ Gross Revenue Change'] = ac_table['Δ Gross Revenue Change'].apply(format_money)
     ac_table['% Change'] = ac_table['% Change'].apply(lambda x: f"{x:.0f}%")
 
     st.subheader("📊 Action Center: Top 15 Trending Packages")
     st.caption(f"(Last 3d: {last_range} vs Prev 3d: {prev_range})")
-    st.dataframe(ac_table, use_container_width=True, hide_index=True)
+
+    # Color positive green, negative red
+    def style_gross_rev(val):
+        if isinstance(val, str):
+            try:
+                n = int(val.replace('$','').replace(',','').replace('-',''))
+                color = 'green' if '-' not in val else 'red'
+            except:
+                color = 'black'
+        else:
+            color = 'black'
+        return f'color: {color}; font-weight: 700;'
+
+    styled = ac_table.drop(columns=['Δ Gross Revenue Change Raw']).style.applymap(
+        style_gross_rev, subset=['Δ Gross Revenue Change']
+    )
+
+    st.dataframe(styled, use_container_width=True, hide_index=True)
 
     # ----------- AI Chatbot Section -----------
     st.markdown("---")
