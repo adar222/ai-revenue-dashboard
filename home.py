@@ -14,41 +14,47 @@ def show_home():
             "icon": "🧠",
             "title": "AI Insights",
             "desc": "AI-powered recommendations and trends",
+            "tab": "AI Insights"
         },
         {
             "icon": "📊",
             "title": "Dashboard",
             "desc": "All key revenue metrics at a glance",
+            "tab": "Dashboard"
         },
         {
             "icon": "🚦",
             "title": "IVT Optimization",
             "desc": "Flag high IVT products & recommend action",
+            "tab": "IVT Optimization"
         },
         {
             "icon": "⚡",
             "title": "RPM Optimization",
             "desc": "Spot low RPM and minimize losses",
+            "tab": "RPM Optimization"
         },
         {
             "icon": "🔍",
             "title": "Pubimps/advimps discrepancy",
             "desc": "Analyze publisher/advertiser impression gaps",
+            "tab": "Pubimps/advimps discrepancy"
         },
     ]
 
-    # Make cards appear in a row
     cols = st.columns(len(cards))
     for idx, card in enumerate(cards):
         with cols[idx]:
+            if st.button(
+                f"{card['icon']} {card['title']}", 
+                key=f"card-btn-{card['tab']}", 
+                help=card["desc"],
+                use_container_width=True
+            ):
+                st.session_state["tab"] = card["tab"]
+                st.rerun()
             st.markdown(
-                f"""
-                <div style="background: #fff; border-radius: 18px; box-shadow: 0 2px 12px #0001; padding: 2em 1em; text-align: center; cursor: pointer;">
-                    <div style="font-size: 2.5rem;">{card["icon"]}</div>
-                    <div style="font-weight: bold; color: #3653ff; font-size: 1.1rem; margin: 0.3em 0 0.4em 0;">{card["title"]}</div>
-                    <div style="font-size: 0.97rem; color: #777; min-height: 35px;">{card["desc"]}</div>
-                </div>
-                """,
+                f"""<div style="text-align: center; font-size: 0.98rem; color: #777;">{card['desc']}</div>""",
                 unsafe_allow_html=True
             )
 
