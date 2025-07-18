@@ -1,45 +1,38 @@
 import streamlit as st
 
 def show_home():
-    # --- STYLES AND ANIMATION ---
+    # --- STYLES: White BG, Modern SaaS ---
     st.markdown("""
         <style>
         html, body, [data-testid="stAppViewContainer"] {
-          background: linear-gradient(-45deg, #e3e8ff, #ede6fa, #e8fcff, #e3f6fc);
-          background-size: 300% 300%;
-          animation: gradientBG 18s ease infinite !important;
-        }
-        @keyframes gradientBG {
-          0% {background-position: 0% 50%;}
-          50% {background-position: 100% 50%;}
-          100% {background-position: 0% 50%;}
+          background: #fff !important;
         }
         .ai-card {
-            background: rgba(255,255,255,0.68);
+            background: rgba(255,255,255,0.82);
             border-radius: 22px;
-            box-shadow: 0 12px 48px #191c2555;
+            box-shadow: 0 10px 32px #191c251a;
             padding: 2.2em 1.1em 1.4em 1.1em;
             text-align: center;
             margin: 0.6em 0.5em 0 0.5em;
             border: 2.5px solid #ecebfc;
-            transition: all .21s cubic-bezier(.34,1.56,.64,1);
-            backdrop-filter: blur(12px);
+            transition: all .18s cubic-bezier(.34,1.56,.64,1);
+            backdrop-filter: blur(7px);
             position: relative;
         }
         .ai-card:hover {
-            box-shadow: 0 22px 72px #5466f744;
-            transform: translateY(-8px) scale(1.045);
-            border-color: #5466f7;
+            box-shadow: 0 18px 48px #5466f728;
+            transform: translateY(-6px) scale(1.035);
+            border-color: #3653ff;
             z-index: 1;
         }
         .card-icon {
             font-size: 2.85rem;
             margin-bottom: 0.25em;
             display: block;
-            transition: transform .18s;
+            transition: transform .16s;
         }
         .ai-card:hover .card-icon {
-            animation: iconBounce 0.45s;
+            animation: iconBounce 0.42s;
         }
         @keyframes iconBounce {
           0%   { transform: scale(1);}
@@ -54,21 +47,21 @@ def show_home():
             margin-top: 1.3em;
             margin-bottom: 1.25em;
             color: #233358;
-            text-shadow: 0 3px 22px #5466f777, 0 0px 2px #fff8;
+            text-shadow: 0 2px 10px #3653ff40, 0 0px 2px #fff8;
             font-family: 'Poppins', 'Inter', sans-serif;
-            letter-spacing: 0.018em;
+            letter-spacing: 0.015em;
         }
         .demo-banner {
             position: absolute;
             top: 22px; right: 34px;
-            background: rgba(44,53,150,0.16);
+            background: rgba(44,53,150,0.13);
             color: #233358;
             padding: 0.43em 1.1em;
             border-radius: 9px;
             font-size: 1em;
             font-weight: 600;
             letter-spacing: 0.03em;
-            box-shadow: 0 1px 12px #9bb8ff33;
+            box-shadow: 0 1px 12px #9bb8ff18;
             z-index: 100;
             display: flex;
             align-items: center;
@@ -95,7 +88,7 @@ def show_home():
     st.markdown('<div class="demo-banner">🛈 Demo Mode: Only Magnite is enabled</div>', unsafe_allow_html=True)
     st.markdown('<div class="headline-glow">AI Revenue Optimizer</div>', unsafe_allow_html=True)
 
-    # --- Demo Advertiser Dropdown, centered with info helper ---
+    # --- Demo Advertiser Dropdown ---
     st.markdown("""
         <div class="dropdown-row">
             <div style='font-size:1.15em;font-weight:600;text-align:center;'>
@@ -114,7 +107,7 @@ def show_home():
     selected_adv = st.selectbox(
         "",
         adv_choices,
-        index=0,  # Magnite is default
+        index=0,
         help="Only Magnite is available for demo. Others will be added in a future version.",
         key="advertiser_demo"
     )
@@ -124,7 +117,7 @@ def show_home():
         st.info("This demo is available only for Magnite. Please select 'Magnite (Demo Enabled)' to use the tool.")
         st.stop()
 
-    # --- Main Glassmorphic Cards with Animated Icon ---
+    # --- Main Cards ---
     cards = [
         {"icon": "🧠", "title": "AI Insights", "desc": "AI-powered recommendations and trends", "tab": "AI Insights"},
         {"icon": "📊", "title": "Dashboard", "desc": "All key revenue metrics at a glance", "tab": "Dashboard"},
