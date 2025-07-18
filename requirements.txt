@@ -5,3 +5,4 @@ openai
 openpyxl
 streamlit-aggrid
 plotly
+matplotlib
