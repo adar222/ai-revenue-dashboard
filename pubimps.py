@@ -1,10 +1,10 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-import plotly.express as px
-
 def show_pubimps():
+    import streamlit as st
+    import pandas as pd
+    import numpy as np
+    from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+    import plotly.express as px
+
     st.title("📊 Impression Discrepancy Checker")
 
     # Use the main DataFrame, as all tabs do
@@ -126,4 +126,7 @@ def show_pubimps():
     st.markdown("---")
     over = (pd.to_numeric(flagged_df['Discrepancy'], errors='coerce') < -0.10).sum() if not flagged_df.empty else 0
     under = (pd.to_numeric(flagged_df['Discrepancy'], errors='coerce') > 0.10).sum() if not flagged_df.empty else 0
-    st.subheader("🤖 AI Impression Discrepancy Insights
+    st.subheader("🤖 AI Impression Discrepancy Insights")
+    st.write(f"• **{under} rows** show under-delivery (publisher reported fewer imps than advertiser by >10%).")
+    st.write(f"• **{over} rows** show over-delivery (publisher reported more imps than advertiser by >10%).")
+    st.caption("_AI-powered insights: Quickly spot and export problematic discrepancies._")
