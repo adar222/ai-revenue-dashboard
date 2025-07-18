@@ -34,7 +34,7 @@ def show_pubimps():
         st.markdown("### Filter Data by Date")
         days = st.number_input(
             "Show data from the past X days (leave empty for all data)",
-            min_value=1, max_value=365, value=30, step=1,
+            min_value=1, max_value=365, value=1, step=1,
         )
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         max_date = df['Date'].max()
