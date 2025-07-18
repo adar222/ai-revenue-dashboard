@@ -68,11 +68,14 @@ def show_pubimps():
     # --- Margin Bar Chart (only negative margin products, top 10 by Gross Revenue) ---
     df_neg = df[df['Margin'] < 0].sort_values('Gross Revenue', ascending=False).head(10)
     if not df_neg.empty:
+        df_neg = df_neg.copy()
+        df_neg['Product'] = df_neg['Product'].astype(str)  # Force product code as string to display full code
         fig = go.Figure()
         fig.add_trace(go.Bar(
-            x=df_neg['Product'].astype(str),  # Product IDs as strings for x-axis
-            y=df_neg['Margin'] * 100,  # convert to percent
+            x=df_neg['Product'],  # Full product code as string
+            y=df_neg['Margin'] * 100,  # Margin in percent (negative values)
             marker_color='red',
+            width=[0.7]*len(df_neg),  # Thicker bars (increase to 0.8 for even thicker)
             text=[f"{x:.1%}" for x in df_neg['Margin']],
             textposition='outside',
             hovertemplate=(
@@ -86,7 +89,7 @@ def show_pubimps():
             xaxis_title="Product",
             yaxis_title="Margin (%)",
             yaxis=dict(tickformat=".0f", showgrid=True),
-            xaxis_tickangle=-45,
+            xaxis_tickangle=-30,
             margin=dict(l=60, r=10, t=50, b=80),
             height=500
         )
