@@ -69,15 +69,17 @@ def show_pubimps():
     df_neg = df[df['Margin'] < 0].sort_values('Gross Revenue', ascending=False).head(10)
     if not df_neg.empty:
         df_neg = df_neg.copy()
-        df_neg['Product'] = df_neg['Product'].astype(str)  # Force product code as string to display full code
+        # Force Product to string so Plotly shows full ID, not 3M/4M etc
+        df_neg['Product'] = df_neg['Product'].astype(str)
         fig = go.Figure()
         fig.add_trace(go.Bar(
-            x=df_neg['Product'],  # Full product code as string
-            y=df_neg['Margin'] * 100,  # Margin in percent (negative values)
+            x=df_neg['Product'],
+            y=df_neg['Margin'] * 100,  # Margin in percent
             marker_color='red',
-            width=[0.7]*len(df_neg),  # Thicker bars (increase to 0.8 for even thicker)
             text=[f"{x:.1%}" for x in df_neg['Margin']],
             textposition='outside',
+            # Make each bar the same width for categorical data
+            width=[0.6 for _ in range(len(df_neg))],
             hovertemplate=(
                 "Product: %{x}<br>Margin: %{y:.1f}%<br>Gross Revenue: $%{customdata:,}<extra></extra>"
             ),
@@ -89,9 +91,10 @@ def show_pubimps():
             xaxis_title="Product",
             yaxis_title="Margin (%)",
             yaxis=dict(tickformat=".0f", showgrid=True),
-            xaxis_tickangle=-30,
+            xaxis=dict(tickangle=-35, tickformat="none"),  # tickformat="none" disables 3M/4M abbreviations
             margin=dict(l=60, r=10, t=50, b=80),
-            height=500
+            height=500,
+            bargap=0.05,  # Reduce gap to make bars thicker
         )
 
         st.plotly_chart(fig, use_container_width=True)
