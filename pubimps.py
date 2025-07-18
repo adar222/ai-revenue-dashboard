@@ -7,7 +7,6 @@ def show_pubimps():
 
     st.title("📊 Impression Discrepancy Checker")
 
-    # Use the main DataFrame, as all tabs do
     df = st.session_state.get("main_df")
     if df is None or df.empty:
         st.info("No data found. Please upload data in the AI Insights tab first.")
@@ -38,18 +37,15 @@ def show_pubimps():
 
     # Show graph FIRST (before any filtering)
     st.subheader("Discrepancy Distribution (Full dataset)")
-
     bins = np.arange(-1, 1.05, 0.05)
     temp_disc = pd.to_numeric(df['Discrepancy'], errors='coerce')
     df['Discrepancy Bin'] = pd.cut(temp_disc, bins=bins)
     bin_counts = df['Discrepancy Bin'].value_counts().sort_index()
     bin_labels = [f"{round(interval.left*100)}% to {round(interval.right*100)}%" for interval in bin_counts.index]
-
     hist_df = pd.DataFrame({
         "Discrepancy Range": bin_labels,
         "Count": bin_counts.values
     })
-
     fig = px.bar(
         hist_df,
         x="Discrepancy Range",
@@ -74,9 +70,11 @@ def show_pubimps():
     elif show_over:
         flagged_df = df[temp_disc < -0.10]
 
-    display_cols = [
-        'Publisher Impressions', 'Advertiser Impressions', 'Discrepancy %'
-    ]
+    # Dynamically select all dimensions + metrics
+    metric_cols = ['Publisher Impressions', 'Advertiser Impressions', 'Discrepancy %']
+    dimension_cols = [col for col in flagged_df.columns if col not in metric_cols + ['Discrepancy', 'Discrepancy Bin']]
+    display_cols = dimension_cols + metric_cols
+
     if not flagged_df.empty:
         gb = GridOptionsBuilder.from_dataframe(flagged_df[display_cols])
         gb.configure_selection('multiple', use_checkbox=True)
