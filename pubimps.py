@@ -10,7 +10,6 @@ def show_pubimps():
         st.warning("No data loaded. Please check your Excel file.")
         return
 
-    # Match Excel column names
     required_cols = [
         'Product', 'Campaign ID',
         'Advertiser Impressions', 'Publisher Impressions',
@@ -22,7 +21,7 @@ def show_pubimps():
         st.dataframe(df.head())
         return
 
-    # Copy and calculate columns
+    # Calculate columns
     df = df.copy()
     df[['Gross Revenue', 'Revenue cost']] = df[['Gross Revenue', 'Revenue cost']].fillna(0)
     df['Impression Gap'] = df['Publisher Impressions'] - df['Advertiser Impressions']
@@ -31,7 +30,7 @@ def show_pubimps():
         axis=1
     )
 
-    # Format for display
+    # Table (unchanged)
     df['Publisher Impressions_fmt'] = df['Publisher Impressions'].apply(lambda x: f"{int(x):,}")
     df['Advertiser Impressions_fmt'] = df['Advertiser Impressions'].apply(lambda x: f"{int(x):,}")
     df['Gross Revenue_fmt'] = df['Gross Revenue'].apply(lambda x: f"{int(x):,}")
@@ -53,7 +52,7 @@ def show_pubimps():
         'Impression Gap_fmt': 'Impression Gap'
     })
 
-    # Color margin column (Styler only works in st.write/st.table in most Streamlit versions)
+    # Color margin column
     def margin_color(val):
         try:
             margin_float = float(val.replace('%',''))
@@ -61,43 +60,42 @@ def show_pubimps():
             margin_float = 0
         color = 'green' if margin_float >= 0 else 'red'
         return f'color: {color}; font-weight: bold'
-
     styler = df_show.style.applymap(margin_color, subset=['Margin'])
 
     st.subheader("All Products - Sort by Any Column")
     st.write(styler)
 
-    # --- Bar Chart: Top 10 products with negative margin ---
+    # --- Margin Bar Chart (only negative margin products, top 10 by Gross Revenue) ---
     df_neg = df[df['Margin'] < 0].sort_values('Gross Revenue', ascending=False).head(10)
     if not df_neg.empty:
         fig = go.Figure()
         fig.add_trace(go.Bar(
-            x=df_neg['Gross Revenue'],
-            y=df_neg['Product'],
-            orientation='h',
+            x=df_neg['Product'].astype(str),  # Product IDs as strings for x-axis
+            y=df_neg['Margin'] * 100,  # convert to percent
             marker_color='red',
-            customdata=df_neg['Margin'],
-            text=[f"${int(gr):,} ({m:.1%})" for gr, m in zip(df_neg['Gross Revenue'], df_neg['Margin'])],
-            textposition='auto',
+            text=[f"{x:.1%}" for x in df_neg['Margin']],
+            textposition='outside',
             hovertemplate=(
-                "Product: %{y}<br>Gross Revenue: $%{x:,}<br>Margin: %{customdata:.1%}<extra></extra>"
+                "Product: %{x}<br>Margin: %{y:.1f}%<br>Gross Revenue: $%{customdata:,}<extra></extra>"
             ),
+            customdata=df_neg['Gross Revenue'],
         ))
 
         fig.update_layout(
-            title="Top 10 Products by Gross Revenue (Negative Margin Only)",
-            xaxis_title="Gross Revenue",
-            yaxis_title="Product",
-            margin=dict(l=80, r=10, t=50, b=40),
-            height=500,
-            xaxis_tickformat=','
+            title="Top 10 Products with Negative Margin (%) by Gross Revenue",
+            xaxis_title="Product",
+            yaxis_title="Margin (%)",
+            yaxis=dict(tickformat=".0f", showgrid=True),
+            xaxis_tickangle=-45,
+            margin=dict(l=60, r=10, t=50, b=80),
+            height=500
         )
 
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("No products with negative margin found.")
 
-    # --- Download CSV for negative margin products ---
+    # Download negative margin products CSV
     st.subheader("Download Negative Margin Products")
     st.download_button(
         "Download CSV",
