@@ -37,7 +37,7 @@ def show_dashboard():
         how='outer', on='Package'
     ).fillna(0)
 
-    merged['Δ Amount'] = merged[f"Last 3d Revenue ({last_range})"] - merged[f"Prev 3d Revenue ({prev_range})"]
+    merged['Δ Gross Revenue'] = merged[f"Last 3d Revenue ({last_range})"] - merged[f"Prev 3d Revenue ({prev_range})"]
     merged['% Change'] = np.where(
         merged[f"Prev 3d Revenue ({prev_range})"] > 0,
         (merged[f"Last 3d Revenue ({last_range})"] - merged[f"Prev 3d Revenue ({prev_range})"]) / merged[f"Prev 3d Revenue ({prev_range})"] * 100,
@@ -45,10 +45,10 @@ def show_dashboard():
     )
     merged = merged.sort_values(f"Last 3d Revenue ({last_range})", ascending=False).head(15)
 
-    ac_table = merged[['Package', f"Last 3d Revenue ({last_range})", f"Prev 3d Revenue ({prev_range})", 'Δ Amount', '% Change']].copy()
+    ac_table = merged[['Package', f"Last 3d Revenue ({last_range})", f"Prev 3d Revenue ({prev_range})", 'Δ Gross Revenue', '% Change']].copy()
     ac_table[f"Last 3d Revenue ({last_range})"] = ac_table[f"Last 3d Revenue ({last_range})"].apply(format_money)
     ac_table[f"Prev 3d Revenue ({prev_range})"] = ac_table[f"Prev 3d Revenue ({prev_range})"].apply(format_money)
-    ac_table['Δ Amount'] = ac_table['Δ Amount'].apply(format_money)
+    ac_table['Δ Gross Revenue'] = ac_table['Δ Gross Revenue'].apply(format_money)
     ac_table['% Change'] = ac_table['% Change'].apply(lambda x: f"{x:.0f}%")
 
     st.subheader("📊 Action Center: Top 15 Trending Packages")
