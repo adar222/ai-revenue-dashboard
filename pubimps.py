@@ -39,7 +39,7 @@ def show_pubimps():
     # User sets the threshold as a percentage
     threshold_pct = st.number_input(
         "Flag rows where absolute discrepancy is greater than (%)",
-        min_value=0, max_value=100, value=10, step=1,
+        min_value=0, max_value=100, value=30, step=1,
         format="%d"
     )
     threshold = threshold_pct / 100  # convert to decimal
