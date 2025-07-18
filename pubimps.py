@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
 def show_pubimps():
     # --- Header with icon and description ---
@@ -21,81 +22,51 @@ def show_pubimps():
         st.warning("No data loaded. Please check your Excel file.")
         return
 
-    # -- Data Preparation --
+    # --- Calculations ---
     df = df.copy()
-    # (rename columns for safety if needed)
-    # --- Calculations
     df['Impression Gap'] = df['Publisher Impressions'] - df['Advertiser Impressions']
     df['Margin'] = (df['Gross Revenue'] - df['Revenue cost']) / df['Gross Revenue']
-    df['Margin_display'] = df['Margin'].apply(lambda x: f"{x:.1%}")
-    df['Margin_color'] = df['Margin'].apply(lambda x: 'green' if x >= 0 else 'red')
 
     # --- Table 1: All Products ---
     st.markdown("### All Products - Sort by Any Column")
-    all_cols = ['Product', 'Campaign ID', 'Publisher Impressions', 'Advertiser Impressions', 'Gross Revenue', 'Revenue cost', 'Margin_display', 'Impression Gap']
-    df_show = df[all_cols].rename(columns={'Margin_display': 'Margin'})
-
-    # Format with thousands separators
+    all_cols = ['Product', 'Campaign ID', 'Publisher Impressions', 'Advertiser Impressions', 'Gross Revenue', 'Revenue cost', 'Margin', 'Impression Gap']
+    df_all = df[all_cols].copy()
+    df_all['Margin'] = df_all['Margin'].apply(lambda x: f"{x:.1%}")
     for col in ['Publisher Impressions', 'Advertiser Impressions', 'Gross Revenue', 'Revenue cost', 'Impression Gap']:
-        df_show[col] = df_show[col].apply(lambda x: f"{int(x):,}")
+        df_all[col] = df_all[col].apply(lambda x: f"{int(x):,}")
 
-    def highlight_margin(val):
-        color = 'green' if '%' in str(val) and not '-' in str(val) else 'red' if '%' in str(val) and '-' in str(val) else 'inherit'
-        return f"color:{color}; font-weight:700"
+    st.dataframe(df_all, use_container_width=True, hide_index=True)
 
-    st.dataframe(
-        df_show.style.applymap(highlight_margin, subset=['Margin']),
-        use_container_width=True,
-        hide_index=True
-    )
-
-    # --- Table 2: Negative Margin Products with Checkboxes ---
+    # --- Table 2: Negative Margin Products with AgGrid Checkboxes ---
     st.markdown("### Products with Negative Margin")
 
     neg_df = df[df['Margin'] < 0].copy()
     neg_df = neg_df.reset_index(drop=True)
+    neg_df_display = neg_df[['Product', 'Campaign ID', 'Publisher Impressions', 'Advertiser Impressions', 'Gross Revenue', 'Revenue cost', 'Margin', 'Impression Gap']].copy()
+    neg_df_display['Margin'] = neg_df_display['Margin'].apply(lambda x: f"{x:.1%}")
 
-    # Add a selection column to session_state to persist checked boxes
-    if 'pubimps_to_block' not in st.session_state or len(st.session_state['pubimps_to_block']) != len(neg_df):
-        st.session_state['pubimps_to_block'] = [False] * len(neg_df)
+    for col in ['Publisher Impressions', 'Advertiser Impressions', 'Gross Revenue', 'Revenue cost', 'Impression Gap']:
+        neg_df_display[col] = neg_df_display[col].apply(lambda x: f"{int(x):,}")
 
-    # Render the table with checkboxes
-    cols = st.columns([0.1, 1, 1, 1, 1, 1, 1, 1, 1])  # First col for checkbox
+    gb = GridOptionsBuilder.from_dataframe(neg_df_display)
+    gb.configure_selection('multiple', use_checkbox=True)
+    gb.configure_column('Margin', cellStyle=lambda params: {"color": "red", "fontWeight": "bold"})
+    grid_options = gb.build()
 
-    header = ["Check to Block", "Product", "Campaign ID", "Publisher Impressions", "Advertiser Impressions", "Gross Revenue", "Revenue cost", "Margin", "Impression Gap"]
-    for i, h in enumerate(header):
-        cols[i].markdown(f"**{h}**")
+    grid_return = AgGrid(
+        neg_df_display,
+        gridOptions=grid_options,
+        update_mode=GridUpdateMode.SELECTION_CHANGED,
+        fit_columns_on_grid_load=True,
+        height=350,
+        enable_enterprise_modules=False
+    )
 
-    # Table rows with checkboxes
-    for idx, row in neg_df.iterrows():
-        # Style the margin red
-        margin_str = f"<span style='color:red;font-weight:700'>{row['Margin_display']}</span>"
-        row_display = [
-            st.session_state['pubimps_to_block'][idx],
-            f"{row['Product']}",
-            f"{row['Campaign ID']}",
-            f"{int(row['Publisher Impressions']):,}",
-            f"{int(row['Advertiser Impressions']):,}",
-            f"{int(row['Gross Revenue']):,}",
-            f"{int(row['Revenue cost']):,}",
-            margin_str,
-            f"{int(row['Impression Gap']):,}",
-        ]
-        # Checkbox in first col, others in next
-        checked = cols[0].checkbox("", value=st.session_state['pubimps_to_block'][idx], key=f"block_pubimps_{idx}")
-        st.session_state['pubimps_to_block'][idx] = checked
-        for i in range(1, len(header)):
-            if i == 7:
-                cols[i].markdown(margin_str, unsafe_allow_html=True)
-            else:
-                cols[i].write(row_display[i])
+    selected = grid_return["selected_rows"]
 
-    # --- Block Selected Button ---
-    checked_rows = [i for i, checked in enumerate(st.session_state['pubimps_to_block']) if checked]
     if st.button("Block Selected"):
-        if checked_rows:
-            blocked_products = neg_df.iloc[checked_rows]['Product'].tolist()
-            st.success(f"Blocked {len(blocked_products)} product(s): {', '.join(map(str, blocked_products))}")
+        if selected:
+            products = [str(row['Product']) for row in selected]
+            st.success(f"Blocked {len(products)} product(s): {', '.join(products)}")
         else:
             st.info("No products selected.")
-
