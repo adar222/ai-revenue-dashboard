@@ -15,7 +15,7 @@ def show_rpm_optimization():
     rpm_threshold = st.number_input("Show products with RPM below:", min_value=0.0, value=0.05, step=0.01)
     req_threshold = st.number_input("Show products with Requests NE higher than:", min_value=0, value=10_000_000, step=1_000_000)
 
-    # --- Column mapping (edit as needed)
+    # --- Column mapping (robust)
     col_map = {col.lower(): col for col in df.columns}
     filtered = df.copy()
     filtered['Campaign ID'] = filtered[col_map['campaign id']]
@@ -124,14 +124,21 @@ def show_rpm_optimization():
         unsafe_allow_html=True
     )
 
-    # --- What-If Simulator Logic (safe check for empty)
+    # --- What-If Simulator Logic (bulletproof for all data types)
+    total_loss = 0
     if selected_rows is not None and len(selected_rows) > 0:
-        total_loss = 0
         for row in selected_rows:
-            net = row['Net Revenue After Serving Costs']
-            # Only add if it's negative (loss)
-            if '-' in str(net):
-                net_int = int(str(net).replace('$', '').replace(',', '').replace('-', ''))
+            net = None
+            for key in row:
+                if "Net Revenue After Serving Costs" in key:
+                    net = row[key]
+                    break
+            if net is None:
+                continue
+            net_str = str(net).replace('$', '').replace(',', '').strip()
+            is_negative = net_str.startswith('-')
+            net_int = int(net_str.replace('-', '')) if net_str.replace('-', '').isdigit() else 0
+            if is_negative and net_int > 0:
                 total_loss += net_int
         if total_loss > 0:
             st.markdown(
@@ -157,8 +164,9 @@ def show_rpm_optimization():
     # --- Show Total Loss (final footer)
     total_negative_margin = 0
     for val in filtered['Net Revenue After Serving Costs']:
+        val_str = str(val).replace('$','').replace(',','').replace('-','')
         if '-' in str(val):
-            total_negative_margin += int(str(val).replace('$','').replace(',','').replace('-',''))
+            total_negative_margin += int(val_str) if val_str.isdigit() else 0
 
     st.markdown(
         f"<div style='margin-top:2em;font-size:1.25rem; font-weight:800; color:#d40000;'>"
