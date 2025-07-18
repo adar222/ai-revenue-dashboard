@@ -67,33 +67,41 @@ def show_pubimps():
     st.subheader("All Products - Sort by Any Column")
     st.write(styler)
 
-    # --- Pie Chart: Only products with negative margin ---
-    df_neg = df[df['Margin'] < 0].copy()
+    # --- Bar Chart: Top 10 products with negative margin ---
+    df_neg = df[df['Margin'] < 0].sort_values('Gross Revenue', ascending=False).head(10)
     if not df_neg.empty:
-        # Label: Product: $Gross Revenue (Margin%)
-        labels = [
-            f"{row['Product']}: ${int(row['Gross Revenue']):,} ({row['Margin']:.1%})"
-            for _, row in df_neg.iterrows()
-        ]
-        values = df_neg['Gross Revenue']
-        # All negative margin slices colored red
-        fig = go.Figure(
-            data=[go.Pie(
-                labels=labels,
-                values=values,
-                marker_colors=['#e04a4a'] * len(labels),
-                hole=0.3,
-                sort=False
-            )]
-        )
-        fig.update_traces(
-            textinfo='label+percent',
-            textposition='inside'
-        )
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=df_neg['Gross Revenue'],
+            y=df_neg['Product'],
+            orientation='h',
+            marker_color='red',
+            customdata=df_neg['Margin'],
+            text=[f"${int(gr):,} ({m:.1%})" for gr, m in zip(df_neg['Gross Revenue'], df_neg['Margin'])],
+            textposition='auto',
+            hovertemplate=(
+                "Product: %{y}<br>Gross Revenue: $%{x:,}<br>Margin: %{customdata:.1%}<extra></extra>"
+            ),
+        ))
+
         fig.update_layout(
-            title="Gross Revenue Distribution for Products with Negative Margin",
-            height=500
+            title="Top 10 Products by Gross Revenue (Negative Margin Only)",
+            xaxis_title="Gross Revenue",
+            yaxis_title="Product",
+            margin=dict(l=80, r=10, t=50, b=40),
+            height=500,
+            xaxis_tickformat=','
         )
+
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("No products with negative margin found.")
+
+    # --- Download CSV for negative margin products ---
+    st.subheader("Download Negative Margin Products")
+    st.download_button(
+        "Download CSV",
+        data=df_neg.to_csv(index=False),
+        file_name="negative_margin_products.csv",
+        mime="text/csv"
+    )
