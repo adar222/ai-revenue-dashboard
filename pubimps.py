@@ -7,10 +7,18 @@ import plotly.express as px
 def show_pubimps():
     st.title("📊 Impression Discrepancy Checker")
 
-    # This expects the DataFrame to be preloaded in session_state as 'pubimps_df'
-    df = st.session_state.get("pubimps_df")
+    # Use the main DataFrame, as all tabs do
+    df = st.session_state.get("main_df")
     if df is None or df.empty:
-        st.info("No data found. Please upload data in the PubImps tab first.")
+        st.info("No data found. Please upload data in the AI Insights tab first.")
+        return
+
+    required_cols = {'Publisher Impressions', 'Advertiser Impressions'}
+    if not required_cols.issubset(set(df.columns)):
+        st.warning(
+            f"Your file must contain these columns: {', '.join(required_cols)}.\n"
+            "If you just uploaded, check your file and re-upload on the AI Insights tab."
+        )
         return
 
     # Ensure numeric types
@@ -18,7 +26,7 @@ def show_pubimps():
     df['Advertiser Impressions'] = pd.to_numeric(df['Advertiser Impressions'], errors='coerce')
 
     # Avoid division by zero
-    df = df[df['Advertiser Impressions'] > 0]
+    df = df[df['Advertiser Impressions'] > 0].copy()
 
     # Calculate discrepancy: 1 - (PubImp / AdvImp)
     df['Discrepancy'] = 1 - (df['Publisher Impressions'] / df['Advertiser Impressions'])
@@ -66,7 +74,6 @@ def show_pubimps():
     elif show_over:
         flagged_df = df[temp_disc < -0.10]
 
-    # Only show selected columns and center everything
     display_cols = [
         'Publisher Impressions', 'Advertiser Impressions', 'Discrepancy %'
     ]
@@ -119,7 +126,4 @@ def show_pubimps():
     st.markdown("---")
     over = (pd.to_numeric(flagged_df['Discrepancy'], errors='coerce') < -0.10).sum() if not flagged_df.empty else 0
     under = (pd.to_numeric(flagged_df['Discrepancy'], errors='coerce') > 0.10).sum() if not flagged_df.empty else 0
-    st.subheader("🤖 AI Impression Discrepancy Insights")
-    st.write(f"• **{under} rows** show under-delivery (publisher reported fewer imps than advertiser by >10%).")
-    st.write(f"• **{over} rows** show over-delivery (publisher reported more imps than advertiser by >10%).")
-    st.caption("_AI-powered insights: Quickly spot and export problematic discrepancies._")
+    st.subheader("🤖 AI Impression Discrepancy Insights
