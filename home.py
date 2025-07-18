@@ -8,7 +8,38 @@ def show_home():
         unsafe_allow_html=True
     )
 
-    # --- Card info: tab value MUST match tab_list in app.py ---
+    st.markdown("""
+        <style>
+        .ai-card {
+            background: #fff;
+            border-radius: 22px;
+            box-shadow: 0 8px 32px #191c2540;
+            padding: 2.2em 1.1em;
+            text-align: center;
+            cursor: pointer;
+            margin: 0.6em 0.5em;
+            transition: box-shadow 0.2s, transform 0.2s;
+            border: 2px solid #fff;
+        }
+        .ai-card:hover {
+            box-shadow: 0 6px 36px #3653ff55;
+            transform: translateY(-4px) scale(1.04);
+            border: 2px solid #3653ff;
+        }
+        .ai-card .card-title {
+            font-weight: 900;
+            color: #3653ff;
+            font-size: 1.35rem;
+            margin: 0.3em 0 0.5em 0;
+        }
+        .ai-card .card-desc {
+            font-size: 1.01rem;
+            color: #686868;
+            min-height: 32px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     cards = [
         {
             "icon": "🧠",
@@ -42,56 +73,24 @@ def show_home():
         },
     ]
 
-    # Add CSS for hover effect and nicer card style
-    st.markdown("""
-        <style>
-        .ai-card {
-            background: #fff;
-            border-radius: 22px;
-            box-shadow: 0 8px 32px #191c2540;
-            padding: 2.2em 1.1em;
-            text-align: center;
-            cursor: pointer;
-            margin: 0.6em 0.5em;
-            transition: box-shadow 0.2s, transform 0.2s;
-            border: 2px solid #fff;
-        }
-        .ai-card:hover {
-            box-shadow: 0 6px 36px #3653ff55;
-            transform: translateY(-4px) scale(1.04);
-            border: 2px solid #3653ff;
-        }
-        .ai-card .card-title {
-            font-weight: 900;
-            color: #3653ff;
-            font-size: 1.35rem;
-            margin: 0.3em 0 0.5em 0;
-        }
-        .ai-card .card-desc {
-            font-size: 1.01rem;
-            color: #686868;
-            min-height: 32px;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
     cols = st.columns(len(cards))
     for i, card in enumerate(cards):
         with cols[i]:
-            # Streamlit's st.button returns True when clicked!
-            if st.button(
-                f"<div class='ai-card'><div style='font-size:2.7rem'>{card['icon']}</div>"
-                f"<div class='card-title'>{card['title']}</div>"
-                f"<div class='card-desc'>{card['desc']}</div></div>",
-                key=f"maincard_{card['tab']}",
-                use_container_width=True,
-                help=card['desc'],
-                type="secondary",
-                args=(),
-                kwargs={},
-            ):
+            # Render the pretty card
+            st.markdown(
+                f"""
+                <div class="ai-card">
+                    <div style='font-size:2.7rem'>{card['icon']}</div>
+                    <div class="card-title">{card['title']}</div>
+                    <div class="card-desc">{card['desc']}</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+            # Place an invisible button below the card for click handling
+            if st.button(" ", key=f"card_{card['tab']}", help=card["desc"], use_container_width=True):
                 st.session_state["tab"] = card["tab"]
-                st.experimental_rerun()  # or st.rerun() if Streamlit >= 1.32
+                st.rerun()
 
     st.markdown(
         "<div style='text-align: center; margin-top: 3em; color: #aaa;'>"
