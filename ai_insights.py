@@ -204,7 +204,7 @@ def show_ai_insights():
 
     # Generate summary & actions
     summary = generate_summary(total_diff, pct_diff, movers_up.iloc[0], movers_down.iloc[0], movers_up.to_dict('records'), movers_down.to_dict('records'))
-    st.markdown(f"<h5><b>AI Revenue Overview — {yesterday.date()} vs {day_before.date()}</b></h5>", unsafe_allow_html=True)
+    st.markdown(f"<h5><b>Yesterday AI Revenue Overview — {yesterday.date()} vs {day_before.date()}</b></h5>", unsafe_allow_html=True)
     st.markdown(f"<div style='font-size:1.1em'>{summary}</div>", unsafe_allow_html=True)
     st.markdown("---")
 
