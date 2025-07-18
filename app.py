@@ -6,7 +6,7 @@ EXCEL_FILE = "DemoAI.xlsx"
 if "main_df" not in st.session_state:
     st.session_state["main_df"] = pd.read_excel(EXCEL_FILE)
 
-from home import show_home         # <-- ADD this import!
+from home import show_home
 from ai_insights import show_ai_insights
 from dashboard import show_dashboard
 from ivt_optimization import show_ivt_optimization
@@ -14,14 +14,7 @@ from rpm_optimization import show_rpm_optimization
 from filter import show_filtering
 from pubimps import show_pubimps
 
-st.set_page_config(
-    page_title="AI Revenue Dashboard",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-with st.sidebar:
-    st.title("Navigation")
+# ---- TAB LOGIC ----
 tab_list = [
     "Home",
     "AI Insights",
@@ -32,6 +25,12 @@ tab_list = [
 ]
 if "tab" not in st.session_state:
     st.session_state["tab"] = "Home"
+
+st.set_page_config(
+    page_title="AI Revenue Dashboard",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 with st.sidebar:
     st.title("Navigation")
@@ -44,9 +43,9 @@ with st.sidebar:
 
 tab = st.session_state["tab"]
 
-
+# ---- MAIN TAB CONTENT ----
 if tab == "Home":
-    show_home()           # <-- Show the homepage with cards/icons
+    show_home()
 elif tab == "AI Insights":
     show_ai_insights()
 elif tab == "Dashboard":
