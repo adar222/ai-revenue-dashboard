@@ -3,7 +3,8 @@ import pandas as pd
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
 def show_pubimps():
-    st.markdown("🔍 <span style='font-size:2rem; font-weight:900;'>Pubimps/Advimps Discrepancy</span>", unsafe_allow_html=True)
+    st.set_page_config(layout="wide")
+    st.markdown("<h2 style='display: flex; align-items: center;'>🔍 Pubimps/Advimps Discrepancy</h2>", unsafe_allow_html=True)
     st.caption("Analyze publisher and advertiser impression gaps and quickly spot products that are losing money.")
 
     df = st.session_state.get("main_df")
@@ -11,75 +12,93 @@ def show_pubimps():
         st.warning("No data loaded. Please check your Excel file.")
         return
 
-    # --- Normalize and map columns for robustness ---
-    col_map = {col.lower().replace(' ', '').replace('_',''): col for col in df.columns}
-    def get_col(key):
-        # Helper to robustly match user-given columns
-        key = key.lower().replace(' ', '').replace('_','')
-        for k, v in col_map.items():
-            if key == k:
-                return v
-        raise Exception(f"Column '{key}' not found in data. Existing: {list(df.columns)}")
-
-    # Calculations
+    # --- Calculated Columns ---
     df = df.copy()
-    df['Impression Gap'] = df[get_col('Publisher Impressions')] - df[get_col('Advertiser Impressions')]
-    df['Margin'] = (df[get_col('Gross Revenue')] - df[get_col('Revenue Cost')]) / df[get_col('Gross Revenue')]
-    df['Margin_fmt'] = df['Margin'].apply(lambda x: f"<span style='color: {'red' if x < 0 else 'green'}; font-weight:bold'>{x:.1%}</span>")
-    df['Margin_num'] = df['Margin'].apply(lambda x: f"{x:.1%}")
+    df["Impression Gap"] = df["Publisher Impressions"] - df["Advertiser Impressions"]
+    df["Margin"] = (df["Gross Revenue"] - df["Revenue cost"]) / df["Gross Revenue"]
+    df["Margin_pct"] = df["Margin"].apply(lambda x: f"{x:.1%}")
+    df["Margin_style"] = df["Margin"].apply(lambda x: "color:red;font-weight:bold" if x < 0 else "color:green;font-weight:bold")
 
-    # Display columns
-    cols_disp = [
-        get_col('Product'), get_col('Campaign ID'),
-        get_col('Publisher Impressions'), get_col('Advertiser Impressions'),
-        get_col('Gross Revenue'), get_col('Revenue Cost'),
-        'Margin_num', 'Impression Gap'
-    ]
-    show = df[cols_disp].rename(columns={'Margin_num': 'Margin'}).copy()
+    # --- AI Insights Panel ---
+    top_loss = df.loc[df["Margin"] < 0].sort_values("Gross Revenue", ascending=False).head(1)
+    total_loss = df.loc[df["Margin"] < 0, "Gross Revenue"].sum() - df.loc[df["Margin"] < 0, "Revenue cost"].sum()
+    loss_products = df.loc[df["Margin"] < 0, "Product"].tolist()
 
-    # Format for display
-    for c in [get_col('Publisher Impressions'), get_col('Advertiser Impressions'),
-              get_col('Gross Revenue'), get_col('Revenue Cost'), 'Impression Gap']:
-        show[c] = show[c].apply(lambda x: f"{int(round(x)):,}" if pd.notnull(x) and str(x).replace(',', '').replace('-', '').isdigit() else x)
+    with st.expander("🤖 AI Highlights & Actions", expanded=True):
+        st.markdown("**Quick Insights:**")
+        if len(top_loss):
+            row = top_loss.iloc[0]
+            st.write(f"- 🚩 **Highest Loss Product:** `{int(row['Product'])}` is losing **${int(row['Revenue cost'] - row['Gross Revenue']):,}** (margin: {row['Margin_pct']})")
+        st.write(f"- 💰 **Total Loss from Negative Margin Products:** <span style='color:red;font-size:1.3em;font-weight:bold;'>-${abs(int(total_loss)):,}</span>", unsafe_allow_html=True)
+        st.write(f"- ✅ **Action:** Select & block products below with negative margin to reduce loss.")
 
-    st.subheader("All Products - Sort by Any Column")
-    st.dataframe(show, use_container_width=True, hide_index=True)
+    st.divider()
 
-    # ---- NEGATIVE MARGIN TABLE ----
+    # --- Sidebar/Top Filters ---
+    with st.container():
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            campaign = st.selectbox("Filter by Campaign", ["All"] + sorted(df["Campaign ID"].astype(str).unique()))
+        with col2:
+            margin_cut = st.slider("Margin Max Threshold", min_value=-1.0, max_value=1.0, value=-0.01, step=0.01)
+        with col3:
+            search = st.text_input("Product Search (ID)")
+
+    # --- Filtered Data ---
+    filtered = df.copy()
+    if campaign != "All":
+        filtered = filtered[filtered["Campaign ID"].astype(str) == campaign]
+    filtered = filtered[filtered["Margin"] <= margin_cut]
+    if search.strip():
+        filtered = filtered[filtered["Product"].astype(str).str.contains(search.strip())]
+
+    # --- Table of All Products (sortable) ---
+    st.subheader("All Products - Sort & Filter")
+    st.dataframe(
+        filtered[
+            ["Product", "Campaign ID", "Publisher Impressions", "Advertiser Impressions", "Gross Revenue", "Revenue cost", "Margin_pct", "Impression Gap"]
+        ].rename(columns={"Margin_pct": "Margin (%)"}),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.divider()
+
+    # --- Negative Margin Products Table with Select-to-Block ---
     st.subheader("Products with Negative Margin")
-    st.caption("Below are products where the margin is negative. You can select products to block by checking the box in the first column.")
+    st.caption("Below are products where the margin is negative. Select rows to block.")
 
-    neg = df[df['Margin'] < 0].copy().reset_index(drop=True)
-    neg_disp = neg[[get_col('Product'), get_col('Campaign ID'), get_col('Publisher Impressions'),
-                    get_col('Advertiser Impressions'), get_col('Gross Revenue'), get_col('Revenue Cost'),
-                    'Margin_num', 'Impression Gap']].rename(columns={'Margin_num': 'Margin'})
-    for c in [get_col('Publisher Impressions'), get_col('Advertiser Impressions'),
-              get_col('Gross Revenue'), get_col('Revenue Cost'), 'Impression Gap']:
-        neg_disp[c] = neg_disp[c].apply(lambda x: f"{int(round(x)):,}" if pd.notnull(x) and str(x).replace(',', '').replace('-', '').isdigit() else x)
+    df_neg = df[df["Margin"] < 0].copy()
+    if df_neg.empty:
+        st.success("No negative margin products found. Good job! 👍")
+        return
 
-    gb = GridOptionsBuilder.from_dataframe(neg_disp)
+    # --- AG Grid with checkbox selection ---
+    gb = GridOptionsBuilder.from_dataframe(
+        df_neg[
+            ["Product", "Campaign ID", "Publisher Impressions", "Advertiser Impressions", "Gross Revenue", "Revenue cost", "Margin_pct", "Impression Gap"]
+        ].rename(columns={"Margin_pct": "Margin (%)"})
+    )
     gb.configure_selection('multiple', use_checkbox=True)
-    for c in neg_disp.columns:
-        gb.configure_column(c, cellStyle={'textAlign': 'center'})
     grid_options = gb.build()
 
     grid_response = AgGrid(
-        neg_disp,
+        df_neg[
+            ["Product", "Campaign ID", "Publisher Impressions", "Advertiser Impressions", "Gross Revenue", "Revenue cost", "Margin_pct", "Impression Gap"]
+        ].rename(columns={"Margin_pct": "Margin (%)"}),
         gridOptions=grid_options,
         update_mode=GridUpdateMode.SELECTION_CHANGED,
         fit_columns_on_grid_load=True,
         height=350,
-        allow_unsafe_jscode=True
+        theme="streamlit",
     )
 
-    selected = grid_response.get('selected_rows', [])
-    if st.button("Block Selected"):
-        if selected:
-            st.success(f"{len(selected)} products would be blocked!")
-        else:
-            st.info("No products selected.")
+    selected = grid_response['selected_rows']
+    if selected:
+        st.success(f"Block action: {len(selected)} product(s) selected. (Product IDs: {', '.join([str(x['Product']) for x in selected])})")
+        if st.button("Block Selected"):
+            st.info("✅ These products would now be flagged for blocking (demo mode).")
+    else:
+        st.info("Select rows above and click 'Block Selected' to block.")
 
-    # Add a summary for total loss
-    total_loss = int(round(neg[get_col('Gross Revenue')].sum() - neg[get_col('Revenue Cost')].sum()))
-    st.markdown(f"<div style='font-size:1.5em; font-weight:bold; color:red;'>Total Loss from Negative Margin Products: -${abs(total_loss):,}</div>", unsafe_allow_html=True)
-
+    st.caption("Tip: Use filters above to find the biggest negative margin leaks!")
