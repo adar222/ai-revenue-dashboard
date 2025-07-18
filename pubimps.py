@@ -29,14 +29,12 @@ def show_pubimps():
     df['Publisher Impressions'] = pd.to_numeric(df['Publisher Impressions'], errors='coerce')
     df['Advertiser Impressions'] = pd.to_numeric(df['Advertiser Impressions'], errors='coerce')
 
-    # Add gross revenue and revenue cost if they exist
-    extra_metric_cols = []
-    if 'Gross Revenue' in df.columns:
+    margin_available = False
+    if 'Gross Revenue' in df.columns and 'Revenue Cost' in df.columns:
         df['Gross Revenue'] = pd.to_numeric(df['Gross Revenue'], errors='coerce').fillna(0)
-        extra_metric_cols.append('Gross Revenue')
-    if 'Revenue Cost' in df.columns:
         df['Revenue Cost'] = pd.to_numeric(df['Revenue Cost'], errors='coerce').fillna(0)
-        extra_metric_cols.append('Revenue Cost')
+        df['Margin'] = df['Gross Revenue'] - df['Revenue Cost']
+        margin_available = True
 
     # Avoid division by zero
     df = df[df['Advertiser Impressions'] > 0].copy()
@@ -60,13 +58,13 @@ def show_pubimps():
     flagged_df['Publisher Impressions'] = flagged_df['Publisher Impressions'].apply(lambda x: f"{int(x):,}")
     flagged_df['Advertiser Impressions'] = flagged_df['Advertiser Impressions'].apply(lambda x: f"{int(x):,}")
     flagged_df['Discrepancy %'] = flagged_df['Discrepancy'].apply(lambda x: f"{x:.2%}")
-    if 'Gross Revenue' in flagged_df.columns:
-        flagged_df['Gross Revenue'] = flagged_df['Gross Revenue'].apply(lambda x: f"{int(round(x)):,}")
-    if 'Revenue Cost' in flagged_df.columns:
-        flagged_df['Revenue Cost'] = flagged_df['Revenue Cost'].apply(lambda x: f"{int(round(x)):,}")
+    if margin_available:
+        flagged_df['Margin'] = flagged_df['Margin'].apply(lambda x: f"{int(round(x)):,}")
 
-    # Display columns: dimensions + always metrics + extras if present
-    metric_cols = ['Publisher Impressions', 'Advertiser Impressions', 'Discrepancy %'] + extra_metric_cols
+    # Display columns: dimensions + always metrics + margin if present
+    metric_cols = ['Publisher Impressions', 'Advertiser Impressions', 'Discrepancy %']
+    if margin_available:
+        metric_cols.append('Margin')
     display_cols = [col for col in dimension_cols if col in flagged_df.columns] + metric_cols
 
     if not flagged_df.empty:
@@ -102,13 +100,11 @@ def show_pubimps():
         disabled=flagged_df.empty
     )
 
-    # Metrics/sum for Gross Revenue and Revenue Cost
-    if not flagged_df.empty and 'Gross Revenue' in df.columns and 'Revenue Cost' in df.columns:
+    # Metrics/sum for Margin
+    if not flagged_df.empty and margin_available:
         # Use unformatted for sum (need to access numeric, not formatted string)
-        gross_sum = df.loc[df['Discrepancy Abs'] > threshold, 'Gross Revenue'].sum()
-        cost_sum = df.loc[df['Discrepancy Abs'] > threshold, 'Revenue Cost'].sum()
-        st.metric("Total Gross Revenue (flagged)", f"${int(round(gross_sum)):,}")
-        st.metric("Total Revenue Cost (flagged)", f"${int(round(cost_sum)):,}")
+        margin_sum = df.loc[df['Discrepancy Abs'] > threshold, 'Margin'].sum()
+        st.metric("Total Margin (flagged)", f"${int(round(margin_sum)):,}")
 
     # AI-driven insights in footer
     st.markdown("---")
