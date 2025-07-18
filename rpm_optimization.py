@@ -44,6 +44,7 @@ def show_rpm_optimization():
     filtered['Net Revenue After Serving Costs'] = filtered['Net Revenue After Serving Costs'].apply(
         lambda x: f"${int(round(x))}" if x >= 0 else f"-${abs(int(round(x)))}"
     )
+    filtered['Request NE'] = filtered['Request NE'].apply(lambda x: f"{int(x):,}")
 
     display_cols = [
         'Profit/Loss Status',
