@@ -36,12 +36,13 @@ def show_pubimps():
     df['Discrepancy'] = 1 - (df['Publisher Impressions'] / df['Advertiser Impressions'])
     df['Discrepancy Abs'] = df['Discrepancy'].abs()
 
-    # User sets the threshold (default 0.10 for 10%)
-    threshold = st.number_input(
-        "Flag rows where absolute discrepancy is greater than:",
-        min_value=0.00, max_value=1.00, value=0.10, step=0.01,
-        format="%.2f"
+    # User sets the threshold as a percentage
+    threshold_pct = st.number_input(
+        "Flag rows where absolute discrepancy is greater than (%)",
+        min_value=0, max_value=100, value=10, step=1,
+        format="%d"
     )
+    threshold = threshold_pct / 100  # convert to decimal
 
     # Filter flagged rows by threshold
     flagged_df = df[df['Discrepancy Abs'] > threshold].copy()
@@ -90,5 +91,5 @@ def show_pubimps():
     # AI-driven insights in footer
     st.markdown("---")
     st.subheader("🤖 AI Impression Discrepancy Insights")
-    st.write(f"• **{len(flagged_df)} rows** show an absolute discrepancy greater than {threshold:.0%}.")
+    st.write(f"• **{len(flagged_df)} rows** show an absolute discrepancy greater than {threshold_pct}%.")
     st.caption("_AI-powered insights: Quickly spot and export problematic discrepancies._")
