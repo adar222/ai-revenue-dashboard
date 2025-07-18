@@ -10,7 +10,10 @@ def show_pubimps():
         st.warning("No data loaded. Please check your Excel file.")
         return
 
-    # Use real column names
+    # Debug: show all columns
+    # st.write("DEBUG columns:", list(df.columns))
+
+    # Use column names from your actual Excel
     required_cols = [
         'Product', 'Campaign ID',
         'Advertiser Impressions', 'Publisher Impressions',
@@ -22,9 +25,16 @@ def show_pubimps():
         st.dataframe(df.head())
         return
 
-    # Calculations
+    # --- Calculations ---
+    # Fill NaNs for math
+    df = df.copy()
+    df[['Gross Revenue', 'Revenue cost']] = df[['Gross Revenue', 'Revenue cost']].fillna(0)
     df['Impression Gap'] = df['Publisher Impressions'] - df['Advertiser Impressions']
-    df['Margin'] = (df['Gross Revenue'] - df['Revenue cost']) / df['Gross Revenue']
+    # Avoid divide by zero for margin
+    df['Margin'] = df.apply(
+        lambda row: (row['Gross Revenue'] - row['Revenue cost']) / row['Gross Revenue'] if row['Gross Revenue'] else 0,
+        axis=1
+    )
 
     # Prepare and format top 10 for table
     df_top = df.sort_values('Impression Gap', ascending=False).head(10).copy()
@@ -51,11 +61,11 @@ def show_pubimps():
         color = 'green' if margin_float >= 0 else 'red'
         return f'color: {color}; font-weight: bold'
 
-    # For Streamlit > 1.27, use st.dataframe with styler directly
     styler = df_show.style.applymap(margin_color, subset=['Margin'])
 
     st.subheader("Top 10 Products by Impression Gap")
-    st.dataframe(styler, use_container_width=True, hide_index=True)
+    st.write("Margin is green if positive, red if negative. All numbers with commas.")
+    st.write(styler)  # Use st.write for colored text in all Streamlit versions
 
     # ---- Plotly infographic with animation ----
     # We need numbers for plotting (not formatted)
