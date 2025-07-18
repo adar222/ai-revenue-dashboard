@@ -67,21 +67,33 @@ def show_pubimps():
     st.subheader("All Products - Sort by Any Column")
     st.write(styler)
 
-    # --- Infographic: Top 10 negative impression gap (Publisher > Advertiser) ---
-    df_neg = df[df['Impression Gap'] < 0].sort_values('Impression Gap').head(10)
+    # --- Pie Chart: Only products with negative margin ---
+    df_neg = df[df['Margin'] < 0].copy()
     if not df_neg.empty:
-        fig = go.Figure(data=[go.Bar(
-            x=df_neg['Product'],
-            y=df_neg['Impression Gap'],
-            marker_color='red'
-        )])
+        # Label: Product: $Gross Revenue (Margin%)
+        labels = [
+            f"{row['Product']}: ${int(row['Gross Revenue']):,} ({row['Margin']:.1%})"
+            for _, row in df_neg.iterrows()
+        ]
+        values = df_neg['Gross Revenue']
+        # All negative margin slices colored red
+        fig = go.Figure(
+            data=[go.Pie(
+                labels=labels,
+                values=values,
+                marker_colors=['#e04a4a'] * len(labels),
+                hole=0.3,
+                sort=False
+            )]
+        )
+        fig.update_traces(
+            textinfo='label+percent',
+            textposition='inside'
+        )
         fig.update_layout(
-            title="Top 10 Products by Negative Impression Gap",
-            xaxis_title="Product",
-            yaxis_title="Impression Gap",
-            margin=dict(l=40, r=10, t=50, b=40),
-            height=450
+            title="Gross Revenue Distribution for Products with Negative Margin",
+            height=500
         )
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("No products with negative Impression Gap found.")
+        st.info("No products with negative margin found.")
