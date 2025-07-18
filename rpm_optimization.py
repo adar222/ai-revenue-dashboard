@@ -57,12 +57,21 @@ def show_rpm_optimization():
         'Net Revenue After Serving Costs',
     ]
 
-    # AgGrid for inline checkboxes (now with center alignment)
+    # AgGrid for inline checkboxes (center values + headers)
     gb = GridOptionsBuilder.from_dataframe(filtered[display_cols])
     gb.configure_selection('multiple', use_checkbox=True)
     for col in display_cols:
-        gb.configure_column(col, cellStyle={'textAlign': 'center'})
+        gb.configure_column(
+            col,
+            cellStyle={'textAlign': 'center'},
+            headerClass='centered-header'
+        )
     grid_options = gb.build()
+
+    # Custom CSS to center headers
+    custom_css = {
+        ".centered-header": {"justify-content": "center !important", "display": "flex !important"}
+    }
 
     grid_return = AgGrid(
         filtered[display_cols],
@@ -71,6 +80,7 @@ def show_rpm_optimization():
         fit_columns_on_grid_load=True,
         height=400,
         enable_enterprise_modules=False,
+        custom_css=custom_css
     )
 
     selected_rows = grid_return['selected_rows']
