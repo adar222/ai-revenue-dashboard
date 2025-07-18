@@ -3,79 +3,83 @@ import pandas as pd
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
 def show_pubimps():
-    st.markdown(
-        "<h1 style='font-size:2.2rem; font-weight:900; display:flex; align-items:center; gap:0.6rem;'>"
-        "🔍 Pubimps/Advimps Discrepancy"
-        "</h1>",
-        unsafe_allow_html=True
-    )
-    st.markdown(
-        "<div style='font-size:1.08rem; color:#656565; margin-bottom:1.1em;'>"
-        "Analyze publisher and advertiser impression gaps and quickly spot products that are losing money."
-        "</div>",
-        unsafe_allow_html=True
-    )
+    st.markdown("🔍 <span style='font-size:2rem; font-weight:900;'>Pubimps/Advimps Discrepancy</span>", unsafe_allow_html=True)
+    st.caption("Analyze publisher and advertiser impression gaps and quickly spot products that are losing money.")
 
     df = st.session_state.get("main_df")
     if df is None or df.empty:
         st.warning("No data loaded. Please check your Excel file.")
         return
 
-    # --- Calculations ---
+    # --- Normalize and map columns for robustness ---
+    col_map = {col.lower().replace(' ', '').replace('_',''): col for col in df.columns}
+    def get_col(key):
+        # Helper to robustly match user-given columns
+        key = key.lower().replace(' ', '').replace('_','')
+        for k, v in col_map.items():
+            if key == k:
+                return v
+        raise Exception(f"Column '{key}' not found in data. Existing: {list(df.columns)}")
+
+    # Calculations
     df = df.copy()
-    df['Impression Gap'] = df['Publisher Impressions'] - df['Advertiser Impressions']
-    df['Margin'] = (df['Gross Revenue'] - df['Revenue cost']) / df['Gross Revenue']
+    df['Impression Gap'] = df[get_col('Publisher Impressions')] - df[get_col('Advertiser Impressions')]
+    df['Margin'] = (df[get_col('Gross Revenue')] - df[get_col('Revenue Cost')]) / df[get_col('Gross Revenue')]
+    df['Margin_fmt'] = df['Margin'].apply(lambda x: f"<span style='color: {'red' if x < 0 else 'green'}; font-weight:bold'>{x:.1%}</span>")
+    df['Margin_num'] = df['Margin'].apply(lambda x: f"{x:.1%}")
 
-    # --- All Products Table (optional, just for context) ---
-    st.markdown("### All Products - Sort by Any Column")
-    all_cols = ['Product', 'Campaign ID', 'Publisher Impressions', 'Advertiser Impressions', 'Gross Revenue', 'Revenue cost', 'Margin', 'Impression Gap']
-    df_all = df[all_cols].copy()
-    df_all['Margin'] = df_all['Margin'].apply(lambda x: f"{x:.1%}" if pd.notnull(x) else "")
-    for col in ['Publisher Impressions', 'Advertiser Impressions', 'Gross Revenue', 'Revenue cost', 'Impression Gap']:
-        df_all[col] = df_all[col].apply(lambda x: f"{int(x):,}" if pd.notnull(x) else "")
-    st.dataframe(df_all, use_container_width=True, hide_index=True)
+    # Display columns
+    cols_disp = [
+        get_col('Product'), get_col('Campaign ID'),
+        get_col('Publisher Impressions'), get_col('Advertiser Impressions'),
+        get_col('Gross Revenue'), get_col('Revenue Cost'),
+        'Margin_num', 'Impression Gap'
+    ]
+    show = df[cols_disp].rename(columns={'Margin_num': 'Margin'}).copy()
 
-    # --- Negative Margin Products Table with Checkbox (AgGrid) ---
-    st.markdown("### Products with Negative Margin")
+    # Format for display
+    for c in [get_col('Publisher Impressions'), get_col('Advertiser Impressions'),
+              get_col('Gross Revenue'), get_col('Revenue Cost'), 'Impression Gap']:
+        show[c] = show[c].apply(lambda x: f"{int(round(x)):,}" if pd.notnull(x) and str(x).replace(',', '').replace('-', '').isdigit() else x)
+
+    st.subheader("All Products - Sort by Any Column")
+    st.dataframe(show, use_container_width=True, hide_index=True)
+
+    # ---- NEGATIVE MARGIN TABLE ----
+    st.subheader("Products with Negative Margin")
     st.caption("Below are products where the margin is negative. You can select products to block by checking the box in the first column.")
 
-    neg_df = df[df['Margin'] < 0].copy().reset_index(drop=True)
+    neg = df[df['Margin'] < 0].copy().reset_index(drop=True)
+    neg_disp = neg[[get_col('Product'), get_col('Campaign ID'), get_col('Publisher Impressions'),
+                    get_col('Advertiser Impressions'), get_col('Gross Revenue'), get_col('Revenue Cost'),
+                    'Margin_num', 'Impression Gap']].rename(columns={'Margin_num': 'Margin'})
+    for c in [get_col('Publisher Impressions'), get_col('Advertiser Impressions'),
+              get_col('Gross Revenue'), get_col('Revenue Cost'), 'Impression Gap']:
+        neg_disp[c] = neg_disp[c].apply(lambda x: f"{int(round(x)):,}" if pd.notnull(x) and str(x).replace(',', '').replace('-', '').isdigit() else x)
 
-    # -- Guarantee all columns are Python built-in types (not numpy, not pd NA) --
-    cols_native = ['Product', 'Campaign ID', 'Publisher Impressions', 'Advertiser Impressions',
-                   'Gross Revenue', 'Revenue cost', 'Margin', 'Impression Gap']
-    neg_display = neg_df[cols_native].copy()
-
-    for col in neg_display.columns:
-        if neg_display[col].dtype == 'float64':
-            neg_display[col] = neg_display[col].apply(lambda x: float(x) if pd.notnull(x) else None)
-        elif neg_display[col].dtype == 'int64':
-            neg_display[col] = neg_display[col].apply(lambda x: int(x) if pd.notnull(x) else None)
-        else:
-            neg_display[col] = neg_display[col].astype(str)
-
-    # Show margin as percent, but as a float for AgGrid coloring
-    neg_display['Margin'] = neg_display['Margin'].astype(float).round(4) * 100  # e.g. -35.41
-    # Now, Margin is a real float in percent format (not a string)
-
-    gb = GridOptionsBuilder.from_dataframe(neg_display)
+    gb = GridOptionsBuilder.from_dataframe(neg_disp)
     gb.configure_selection('multiple', use_checkbox=True)
-    gb.configure_column("Margin", type=["numericColumn"], cellStyle=lambda params: {"color": "red" if params.value < 0 else "green"})
+    for c in neg_disp.columns:
+        gb.configure_column(c, cellStyle={'textAlign': 'center'})
     grid_options = gb.build()
 
     grid_response = AgGrid(
-        neg_display,
+        neg_disp,
         gridOptions=grid_options,
         update_mode=GridUpdateMode.SELECTION_CHANGED,
         fit_columns_on_grid_load=True,
-        allow_unsafe_jscode=True,
-        height=350
+        height=350,
+        allow_unsafe_jscode=True
     )
 
-    selected = grid_response["selected_rows"]
+    selected = grid_response.get('selected_rows', [])
     if st.button("Block Selected"):
         if selected:
-            products = [str(row['Product']) for row in selected]
-            st.success(f"Blocked {len(products)} product(s): {', '.join(products)}")
+            st.success(f"{len(selected)} products would be blocked!")
         else:
             st.info("No products selected.")
+
+    # Add a summary for total loss
+    total_loss = int(round(neg[get_col('Gross Revenue')].sum() - neg[get_col('Revenue Cost')].sum()))
+    st.markdown(f"<div style='font-size:1.5em; font-weight:bold; color:red;'>Total Loss from Negative Margin Products: -${abs(total_loss):,}</div>", unsafe_allow_html=True)
+
