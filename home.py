@@ -8,38 +8,40 @@ def show_home():
         unsafe_allow_html=True
     )
 
-    # Custom CSS for card hover and layout
+    # Card CSS (pretty, hover, shadow, rounded, etc.)
     st.markdown("""
         <style>
         .card-btn {
+            display: block;
             border: none;
             background: #fff;
             border-radius: 22px;
             box-shadow: 0 2px 14px #0002;
-            padding: 2em 1em 1.3em 1em;
-            transition: box-shadow 0.2s, transform 0.2s;
+            padding: 2.5em 1.3em 1.5em 1.3em;
+            margin-bottom: 0.5em;
+            transition: box-shadow 0.22s, transform 0.18s;
             cursor: pointer;
             width: 100%;
-            margin-bottom: 0.5em;
+            text-align: center;
         }
         .card-btn:hover {
             box-shadow: 0 8px 32px #3653ff44, 0 2px 14px #0001;
-            transform: translateY(-6px) scale(1.03);
+            transform: translateY(-5px) scale(1.025);
         }
         .card-icon {
-            font-size: 2.8rem;
-            line-height: 2.8rem;
+            font-size: 3rem;
+            margin-bottom: 0.2em;
         }
         .card-title {
             font-weight: bold;
-            color: #3653ff;
-            font-size: 1.18rem;
-            margin: 0.5em 0 0.3em 0;
+            color: #2357f5;
+            font-size: 1.22rem;
+            margin-bottom: 0.30em;
         }
         .card-desc {
-            font-size: 1rem;
+            font-size: 1.04rem;
             color: #666;
-            min-height: 35px;
+            min-height: 36px;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -56,19 +58,20 @@ def show_home():
     for idx, card in enumerate(cards):
         with cols[idx]:
             clicked = st.button(
-                label=f"{card['icon']}  {card['title']}",
+                "",
                 key=f"card-btn-{card['tab']}",
                 help=card["desc"],
                 use_container_width=True
             )
             st.markdown(
                 f"""
-                <div class="card-btn" onclick="window.dispatchEvent(new CustomEvent('stButtonClick', {{detail: '{card['tab']}'}}));">
+                <div class="card-btn">
                     <div class="card-icon">{card['icon']}</div>
                     <div class="card-title">{card['title']}</div>
                     <div class="card-desc">{card['desc']}</div>
                 </div>
-                """, unsafe_allow_html=True
+                """,
+                unsafe_allow_html=True
             )
             if clicked:
                 st.session_state["tab"] = card["tab"]
