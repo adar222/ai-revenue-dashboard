@@ -27,12 +27,12 @@ def show_pubimps():
     df['Margin'] = (df['Gross Revenue'] - df['Revenue cost']) / df['Gross Revenue']
 
     # --- All Products Table (optional, just for context) ---
-    st.markdown("### All Products")
+    st.markdown("### All Products - Sort by Any Column")
     all_cols = ['Product', 'Campaign ID', 'Publisher Impressions', 'Advertiser Impressions', 'Gross Revenue', 'Revenue cost', 'Margin', 'Impression Gap']
     df_all = df[all_cols].copy()
-    df_all['Margin'] = df_all['Margin'].apply(lambda x: f"{x:.1%}")
+    df_all['Margin'] = df_all['Margin'].apply(lambda x: f"{x:.1%}" if pd.notnull(x) else "")
     for col in ['Publisher Impressions', 'Advertiser Impressions', 'Gross Revenue', 'Revenue cost', 'Impression Gap']:
-        df_all[col] = df_all[col].apply(lambda x: f"{int(x):,}")
+        df_all[col] = df_all[col].apply(lambda x: f"{int(x):,}" if pd.notnull(x) else "")
     st.dataframe(df_all, use_container_width=True, hide_index=True)
 
     # --- Negative Margin Products Table with Checkbox (AgGrid) ---
@@ -41,12 +41,22 @@ def show_pubimps():
 
     neg_df = df[df['Margin'] < 0].copy().reset_index(drop=True)
 
-    # Ensure all columns are Python native types for AgGrid
-    for col in neg_df.columns:
-        neg_df[col] = neg_df[col].apply(lambda x: x.item() if hasattr(x, 'item') else x)
+    # -- Guarantee all columns are Python built-in types (not numpy, not pd NA) --
+    cols_native = ['Product', 'Campaign ID', 'Publisher Impressions', 'Advertiser Impressions',
+                   'Gross Revenue', 'Revenue cost', 'Margin', 'Impression Gap']
+    neg_display = neg_df[cols_native].copy()
 
-    neg_display = neg_df[['Product', 'Campaign ID', 'Publisher Impressions', 'Advertiser Impressions', 'Gross Revenue', 'Revenue cost', 'Margin', 'Impression Gap']].copy()
-    neg_display['Margin'] = neg_display['Margin'].apply(lambda x: round(x * 100, 1))  # Percent, keep as float for coloring
+    for col in neg_display.columns:
+        if neg_display[col].dtype == 'float64':
+            neg_display[col] = neg_display[col].apply(lambda x: float(x) if pd.notnull(x) else None)
+        elif neg_display[col].dtype == 'int64':
+            neg_display[col] = neg_display[col].apply(lambda x: int(x) if pd.notnull(x) else None)
+        else:
+            neg_display[col] = neg_display[col].astype(str)
+
+    # Show margin as percent, but as a float for AgGrid coloring
+    neg_display['Margin'] = neg_display['Margin'].astype(float).round(4) * 100  # e.g. -35.41
+    # Now, Margin is a real float in percent format (not a string)
 
     gb = GridOptionsBuilder.from_dataframe(neg_display)
     gb.configure_selection('multiple', use_checkbox=True)
