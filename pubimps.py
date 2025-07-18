@@ -20,7 +20,14 @@ def show_pubimps():
         )
         return
 
-    # Ensure numeric types
+    # === Specify your dimension columns here ===
+    dimension_cols = []
+    for col in ['Date', 'Publisher', 'Campaign ID']:
+        if col in df.columns:
+            dimension_cols.append(col)
+    # Add/remove from above list to match your file's dimension fields
+
+    # Ensure numeric types for calculations
     df['Publisher Impressions'] = pd.to_numeric(df['Publisher Impressions'], errors='coerce')
     df['Advertiser Impressions'] = pd.to_numeric(df['Advertiser Impressions'], errors='coerce')
 
@@ -30,7 +37,7 @@ def show_pubimps():
     # Calculate discrepancy: 1 - (PubImp / AdvImp)
     df['Discrepancy'] = 1 - (df['Publisher Impressions'] / df['Advertiser Impressions'])
 
-    # Format large numbers with commas
+    # Format numbers for display
     df['Publisher Impressions'] = df['Publisher Impressions'].apply(lambda x: f"{int(x):,}")
     df['Advertiser Impressions'] = df['Advertiser Impressions'].apply(lambda x: f"{int(x):,}")
     df['Discrepancy %'] = df['Discrepancy'].apply(lambda x: f"{x:.2%}")
@@ -70,10 +77,9 @@ def show_pubimps():
     elif show_over:
         flagged_df = df[temp_disc < -0.10]
 
-    # Dynamically select all dimensions + metrics
+    # Specify metrics columns for output
     metric_cols = ['Publisher Impressions', 'Advertiser Impressions', 'Discrepancy %']
-    dimension_cols = ['Date', 'Publisher', 'Campaign ID']  # Edit as needed
-    display_cols = dimension_cols + metric_cols
+    display_cols = [col for col in dimension_cols if col in flagged_df.columns] + metric_cols
 
     if not flagged_df.empty:
         gb = GridOptionsBuilder.from_dataframe(flagged_df[display_cols])
