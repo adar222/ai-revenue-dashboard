@@ -2,6 +2,14 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
+def guess_column(df, possible_names, fallback=None):
+    """Guess a column in df from a list of possible names."""
+    for name in possible_names:
+        for col in df.columns:
+            if name.lower() in col.lower():
+                return col
+    return fallback
+
 def show_ivt_optimization():
     st.title("🏴 IVT Optimization Recommendations")
 
@@ -20,43 +28,54 @@ def show_ivt_optimization():
         else:
             st.stop()
 
-    # --- 2. User Inputs ---
-    days = st.number_input("Show data for last... days", min_value=1, max_value=60, value=3)
-    ivt_threshold = st.number_input("IVT Threshold (%)", min_value=0, max_value=100, value=10)
+    # --- 2. Dynamically guess/ask for columns ---
+    # Guess all columns, fallback to user selection if ambiguous
+    date_col = guess_column(df, ["date"])
+    request_col = guess_column(df, ["request", "impression", "req"])
+    revenue_col = guess_column(df, ["gross revenue", "revenue", "amount", "total"])
+    ivt_candidates = [col for col in df.columns if "ivt" in col.lower() or "invalid" in col.lower()]
+
+    # Interactive column selection if not found
+    with st.expander("Column Selection (if wrong, pick the right one):"):
+        date_col = st.selectbox("Date column:", df.columns, index=df.columns.get_loc(date_col) if date_col else 0)
+        request_col = st.selectbox("Requests column:", df.columns, index=df.columns.get_loc(request_col) if request_col else 0)
+        revenue_col = st.selectbox("Revenue column:", df.columns, index=df.columns.get_loc(revenue_col) if revenue_col else 0)
+        if len(ivt_candidates) > 1:
+            ivt_col = st.selectbox("IVT column:", ivt_candidates)
+        elif len(ivt_candidates) == 1:
+            ivt_col = ivt_candidates[0]
+        else:
+            ivt_col = st.selectbox("IVT column:", df.columns)
+    
+    group_cols_possible = ["Product", "Package", "Campaign ID", "Campaign", "Ad Group", "Site"]
+    group_cols = [col for col in group_cols_possible if col in df.columns]
+    if not group_cols:
+        group_cols = st.multiselect("Columns to group by (at least one required):", df.columns, default=df.columns[0])
+    else:
+        st.markdown(f"**Grouping by:** {', '.join(group_cols)}")
 
     # --- 3. Filter by date ---
-    if 'Date' in df.columns:
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        end_date = df['Date'].max()
-        start_date = end_date - pd.Timedelta(days=days-1)
-        filtered_df = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)]
-    else:
-        st.error("Date column not found in your data!")
+    try:
+        df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
+    except Exception:
+        st.error(f"Date conversion failed for column {date_col}.")
         st.stop()
+
+    days = st.number_input("Show data for last... days", min_value=1, max_value=60, value=3)
+    end_date = df[date_col].max()
+    start_date = end_date - pd.Timedelta(days=days-1)
+    filtered_df = df[(df[date_col] >= start_date) & (df[date_col] <= end_date)]
 
     if filtered_df.empty:
         st.info("No data in the selected date range.")
         st.stop()
 
-    # --- 4. Column selection for IVT ---
-    ivt_candidates = [col for col in filtered_df.columns if 'ivt' in col.lower()]
-    if ivt_candidates:
-        ivt_col = ivt_candidates[0]
-    else:
-        ivt_col = st.selectbox("Select IVT column", filtered_df.columns)
-    if ivt_col not in filtered_df.columns:
-        st.error(f"Column '{ivt_col}' not found in data.")
-        st.stop()
-
-    # --- 5. Aggregate by Product ID, Package, Campaign ID, Campaign ---
-    group_cols = ['Product', 'Package', 'Campaign ID', 'Campaign']
-    agg_dict = {}
-    if 'Requests' in filtered_df.columns:
-        agg_dict['Requests'] = 'sum'
-    if 'Gross Revenue' in filtered_df.columns:
-        agg_dict['Gross Revenue'] = 'sum'
-    agg_dict[ivt_col] = ['mean', 'max']
-
+    # --- 4. Aggregate ---
+    agg_dict = {
+        request_col: "sum",
+        revenue_col: "sum",
+        ivt_col: ["mean", "max"]
+    }
     group_cols = [col for col in group_cols if col in filtered_df.columns]
 
     try:
@@ -67,73 +86,76 @@ def show_ivt_optimization():
         st.write("Aggregation dict:", agg_dict)
         st.stop()
 
-    # --- 6. Flatten multiindex columns ---
+    # Flatten columns
     def flatten_col(col):
         if isinstance(col, tuple):
-            if col[1] == '':
+            if col[1] == "":
                 return col[0]
-            elif col[1] == 'mean':
-                return 'Avg IVT'
-            elif col[1] == 'max':
-                return 'Max IVT'
+            elif col[1] == "mean":
+                return "Avg IVT"
+            elif col[1] == "max":
+                return "Max IVT"
             else:
                 return f"{col[0]} {col[1]}"
         return col
     agg_df.columns = [flatten_col(c) for c in agg_df.columns]
     agg_df = agg_df.reset_index()
 
-    # --- 7. Defensive: find actual column names dynamically ---
-    max_ivt_col = next((c for c in agg_df.columns if 'max' in c.lower() and 'ivt' in c.lower()), None)
-    avg_ivt_col = next((c for c in agg_df.columns if 'avg' in c.lower() and 'ivt' in c.lower()), None)
-    if not max_ivt_col:
-        st.error(f"No 'Max IVT' column found! Columns: {agg_df.columns.tolist()}")
-        st.stop()
+    # Find new col names
+    req_col_agg = request_col
+    rev_col_agg = revenue_col
+    avg_ivt_col = next((c for c in agg_df.columns if "avg" in c.lower() and "ivt" in c.lower()), None)
+    max_ivt_col = next((c for c in agg_df.columns if "max" in c.lower() and "ivt" in c.lower()), None)
 
-    # --- 8. Format columns ---
+    # Format IVT columns as percent strings, but keep numeric for logic
     if avg_ivt_col:
-        agg_df[avg_ivt_col] = agg_df[avg_ivt_col].round(0).astype('Int64').astype(str) + '%'
-    agg_df[max_ivt_col] = agg_df[max_ivt_col].round(0).astype('Int64').astype(str) + '%'
+        agg_df[avg_ivt_col + " Numeric"] = agg_df[avg_ivt_col]
+        agg_df[avg_ivt_col] = agg_df[avg_ivt_col].round(0).astype('Int64').astype(str) + "%"
+    agg_df[max_ivt_col + " Numeric"] = agg_df[max_ivt_col]
+    agg_df[max_ivt_col] = agg_df[max_ivt_col].round(0).astype('Int64').astype(str) + "%"
 
-    # Recommendation logic (using numeric for logic, not formatted string)
-    agg_df['Max IVT Numeric'] = agg_df[max_ivt_col].str.replace('%', '', regex=False).astype(float)
-    agg_df['Recommendation'] = np.where(
-        agg_df['Max IVT Numeric'] >= ivt_threshold,
+    # Recommendation logic (use numeric column)
+    ivt_threshold = st.number_input("IVT Threshold (%)", min_value=0, max_value=100, value=10)
+    agg_df["Recommendation"] = np.where(
+        agg_df[max_ivt_col + " Numeric"] >= ivt_threshold,
         "🚩 Block product at campaign level",
         "No action"
     )
 
-    # --- 9. Keep numeric columns for calculations ---
-    if 'Gross Revenue' in agg_df.columns:
-        agg_df['Gross Revenue Numeric'] = agg_df['Gross Revenue'].replace('[\$,]', '', regex=True).astype(float)
-        agg_df['Gross Revenue'] = agg_df['Gross Revenue Numeric'].apply(lambda x: f"${int(round(x, 0)):,}")
-
+    # Keep numeric revenue column for totals
+    agg_df[rev_col_agg + " Numeric"] = pd.to_numeric(agg_df[rev_col_agg], errors="coerce").fillna(0)
+    agg_df[rev_col_agg] = agg_df[rev_col_agg + " Numeric"].apply(lambda x: f"${int(round(x, 0)):,}")
+    agg_df[req_col_agg + " Numeric"] = pd.to_numeric(agg_df[req_col_agg], errors="coerce").fillna(0)
+    
     # Add "Check to Block" column (for demo, default False)
     agg_df['Check to Block'] = False
 
-    # --- 10. CALCULATE COUNTERS BEFORE DROPPING COLUMNS ---
-    total_revenue = agg_df['Gross Revenue Numeric'].sum() if 'Gross Revenue Numeric' in agg_df.columns else 0
-    total_requests = agg_df['Requests'].sum() if 'Requests' in agg_df.columns else 0
+    # --- COUNTERS (before dropping numeric columns) ---
+    total_revenue = agg_df[rev_col_agg + " Numeric"].sum()
+    total_requests = agg_df[req_col_agg + " Numeric"].sum()
     flagged_count = (agg_df['Recommendation'] == "🚩 Block product at campaign level").sum()
 
     st.markdown(
-        f"**Data aggregated by Product, Package, Campaign ID, and Campaign**  \n"
+        f"**Data aggregated by {', '.join(group_cols)}**  \n"
         f"**Period:** {start_date.date()} – {end_date.date()}"
     )
-
     st.markdown(
         f"**Total Revenue:** ${total_revenue:,.0f}   "
         f"**Total Requests:** {int(total_requests):,}   "
         f"**Flagged Products:** {flagged_count}"
     )
 
-    # --- 11. Choose columns for display AFTER calculations ---
-    display_cols = group_cols + ['Requests', 'Gross Revenue']
+    # --- Display Table ---
+    display_cols = group_cols + [
+        req_col_agg, rev_col_agg
+    ]
     if avg_ivt_col:
         display_cols.append(avg_ivt_col)
-    display_cols += [max_ivt_col, 'Recommendation', 'Check to Block']
-    display_cols = [col for col in display_cols if col in agg_df.columns and col != 'Gross Revenue Numeric']
+    display_cols += [
+        max_ivt_col, "Recommendation", "Check to Block"
+    ]
+    display_cols = [col for col in display_cols if col in agg_df.columns]
 
-    # --- 12. Data Editor ---
     st.markdown("#### Recommendations Table")
     edited_df = st.data_editor(
         agg_df[display_cols],
@@ -147,16 +169,20 @@ def show_ivt_optimization():
         key="ivt_editor"
     )
 
-    # --- 13. Download and Block Buttons ---
     st.download_button(
         "Download Recommendations as CSV",
         edited_df[display_cols].to_csv(index=False),
         file_name="ivt_recommendations.csv",
         mime="text/csv"
     )
+
     if st.button("Block checked products (demo)"):
         checked = edited_df[edited_df['Check to Block']]
         st.success(f"Demo: {len(checked)} product-campaign(s) would be blocked.")
 
     from datetime import datetime
     st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
+# Uncomment below to run standalone:
+# if __name__ == "__main__":
+#     show_ivt_optimization()
