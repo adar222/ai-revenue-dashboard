@@ -8,6 +8,30 @@ def show_home():
         unsafe_allow_html=True
     )
 
+    # --- Demo Advertiser Dropdown ---
+    st.markdown(
+        "<div style='text-align:center;font-size:1.15em;font-weight:600;margin-bottom:1em;'>Choose Advertiser for Demo</div>",
+        unsafe_allow_html=True
+    )
+    adv_choices = [
+        "Magnite (Demo Enabled)",
+        "Pubmatic (Demo Disabled)",
+        "OpenX (Demo Disabled)",
+        "TripleLift (Demo Disabled)"
+    ]
+    selected_adv = st.selectbox(
+        "",
+        adv_choices,
+        index=0,  # Magnite is default
+        help="Only Magnite is available for demo. Others will be added in a future version.",
+        key="advertiser_demo"
+    )
+    st.session_state["selected_advertiser"] = selected_adv.split(" ")[0]  # Get "Magnite" part
+
+    if selected_adv != adv_choices[0]:
+        st.info("This demo is available only for Magnite. Please select 'Magnite (Demo Enabled)' to use the tool.")
+        st.stop()
+
     st.markdown("""
         <style>
         .ai-card {
@@ -43,7 +67,7 @@ def show_home():
     cards = [
         {"icon": "🧠", "title": "AI Insights", "desc": "AI-powered recommendations and trends", "tab": "AI Insights"},
         {"icon": "📊", "title": "Dashboard", "desc": "All key revenue metrics at a glance", "tab": "Dashboard"},
-        {"icon": "🚦", "title": "IVT Optimization", "desc": "Flag high IVT products & recommend action", "tab": "IVT Optimization"},
+        {"icon": "🏴", "title": "IVT Optimization", "desc": "Flag high IVT products & recommend action", "tab": "IVT Optimization"},
         {"icon": "⚡", "title": "RPM Optimization", "desc": "Spot low RPM and minimize losses", "tab": "RPM Optimization"},
         {"icon": "🔍", "title": "Pubimps/advimps discrepancy", "desc": "Analyze publisher/advertiser impression gaps", "tab": "Pubimps/advimps discrepancy"},
     ]
