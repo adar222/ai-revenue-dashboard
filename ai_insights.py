@@ -55,10 +55,10 @@ def generate_summary(total_diff, pct_diff, top_gainer, top_loser, df_up, df_down
     if len(df_up) > 1:
         summary += (
             f"Other strong risers included <b>{df_up[1]['Package']}</b> and <b>{df_up[2]['Package']}</b>, "
-            f"thanks to {df_up[1]['Reason'].lower()} and {df_up[2]['Reason'].lower()}. "
+            f"thanks to {df_up[1]['Reason'].lower()} and {df_up[2]['Reason'].lower()}."
         )
     summary += (
-        f"On the downside, <b>{top_loser['Package']}</b> had the largest drop "
+        f" On the downside, <b>{top_loser['Package']}</b> had the largest drop "
         f"({color_arrow(top_loser['Δ'])} -${abs(top_loser['Δ']):,.0f}), with {top_loser['Reason'].lower()}."
     )
     if len(df_down) > 1:
@@ -202,6 +202,21 @@ def show_ai_insights():
     total_diff = total_rev_yest - total_rev_before
     pct_diff = (total_diff / total_rev_before * 100) if total_rev_before > 0 else 0
 
+    # --- Add summary metric at a glance ---
+    delta_color = "normal"
+    if pct_diff > 0:
+        delta_color = "inverse"  # Green for positive
+    elif pct_diff < 0:
+        delta_color = "off"      # Red for negative
+
+    st.markdown("### :star: Business Impact at a Glance")
+    st.metric(
+        label="Gross Revenue Change (Yesterday vs Day Before)",
+        value=f"${total_rev_yest:,.0f}",
+        delta=f"{total_diff:+,.0f} ({pct_diff:+.1f}%)",
+        delta_color=delta_color
+    )
+
     # Generate summary & actions
     summary = generate_summary(total_diff, pct_diff, movers_up.iloc[0], movers_down.iloc[0], movers_up.to_dict('records'), movers_down.to_dict('records'))
     st.markdown(f"<h5><b>Yesterday AI Revenue Overview — {yesterday.date()} vs {day_before.date()}</b></h5>", unsafe_allow_html=True)
@@ -293,4 +308,3 @@ Day Before Revenue: {int(prev_rev)}"""
                 st.markdown(answer)
             except Exception as e:
                 st.error(f"AI Error: {e}")
-
