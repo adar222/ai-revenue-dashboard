@@ -102,51 +102,38 @@ def show_ivt_optimization():
         "No action"
     )
 
-    # --- FIX: Keep Gross Revenue numeric for calculations ---
+    # --- 9. Keep numeric columns for calculations ---
     if 'Gross Revenue' in agg_df.columns:
-        # Always keep a numeric column for calculations
         agg_df['Gross Revenue Numeric'] = agg_df['Gross Revenue'].replace('[\$,]', '', regex=True).astype(float)
         agg_df['Gross Revenue'] = agg_df['Gross Revenue Numeric'].apply(lambda x: f"${int(round(x, 0)):,}")
 
     # Add "Check to Block" column (for demo, default False)
     agg_df['Check to Block'] = False
 
-    # Display date range and summary
+    # --- 10. CALCULATE COUNTERS BEFORE DROPPING COLUMNS ---
+    total_revenue = agg_df['Gross Revenue Numeric'].sum() if 'Gross Revenue Numeric' in agg_df.columns else 0
+    total_requests = agg_df['Requests'].sum() if 'Requests' in agg_df.columns else 0
+    flagged_count = (agg_df['Recommendation'] == "🚩 Block product at campaign level").sum()
+
     st.markdown(
         f"**Data aggregated by Product, Package, Campaign ID, and Campaign**  \n"
         f"**Period:** {start_date.date()} – {end_date.date()}"
     )
 
-    # --- FIX: Use only numeric columns for counters ---
-    total_revenue = agg_df['Gross Revenue Numeric'].sum() if 'Gross Revenue Numeric' in agg_df.columns else 0
-    total_requests = agg_df['Requests'].sum() if 'Requests' in agg_df.columns else 0
-    flagged_count = (agg_df['Recommendation'] == "🚩 Block product at campaign level").sum()
     st.markdown(
         f"**Total Revenue:** ${total_revenue:,.0f}   "
         f"**Total Requests:** {int(total_requests):,}   "
         f"**Flagged Products:** {flagged_count}"
     )
 
-    # Choose columns for display, hide the numeric column
+    # --- 11. Choose columns for display AFTER calculations ---
     display_cols = group_cols + ['Requests', 'Gross Revenue']
     if avg_ivt_col:
         display_cols.append(avg_ivt_col)
     display_cols += [max_ivt_col, 'Recommendation', 'Check to Block']
-    # Don't show Gross Revenue Numeric in the table
     display_cols = [col for col in display_cols if col in agg_df.columns and col != 'Gross Revenue Numeric']
 
-    # --- 9. Color Max IVT text in data_editor ---
-    def color_text(val):
-        try:
-            num = int(str(val).replace('%', '').strip())
-            if num >= ivt_threshold:
-                return "color: red; font-weight: bold;"
-            else:
-                return "color: green; font-weight: bold;"
-        except Exception:
-            return ""
-
-    # Show the single table with checkboxes and styled Max IVT column
+    # --- 12. Data Editor ---
     st.markdown("#### Recommendations Table")
     edited_df = st.data_editor(
         agg_df[display_cols],
@@ -160,11 +147,7 @@ def show_ivt_optimization():
         key="ivt_editor"
     )
 
-    # NOTE: As of now, st.data_editor doesn't support rich formatting on individual cell text.
-    # If you want *in-table* coloring, you'd have to use st.dataframe + .style, but then you lose the checkbox.
-    # For now: color logic can be in a legend, or show below.
-
-    # --- Download and Block Buttons ---
+    # --- 13. Download and Block Buttons ---
     st.download_button(
         "Download Recommendations as CSV",
         edited_df[display_cols].to_csv(index=False),
