@@ -93,14 +93,17 @@ def show_pubimps():
         theme="streamlit",
     )
 
-    selected = grid_response.get('selected_rows', [])
-    # Defensive programming: Only select rows with Product present!
-    selected_ids = [str(x.get('Product', '')) for x in selected if 'Product' in x and x.get('Product', '') != '']
-    if selected_ids:
-        st.success(f"Block action: {len(selected_ids)} product(s) selected. (Product IDs: {', '.join(selected_ids)})")
-        if st.button("Block Selected"):
-            st.info("✅ These products would now be flagged for blocking (demo mode).")
-    else:
-        st.info("Select rows above and click 'Block Selected' to block.")
+selected = grid_response.get('selected_rows', [])
+# Defensive: Only keep rows with Product present and not empty
+selected_ids = [
+    str(x['Product']) for x in selected
+    if isinstance(x, dict) and 'Product' in x and str(x['Product']).strip() != ''
+]
+if selected_ids:
+    st.success(f"Block action: {len(selected_ids)} product(s) selected. (Product IDs: {', '.join(selected_ids)})")
+    if st.button("Block Selected"):
+        st.info("✅ These products would now be flagged for blocking (demo mode).")
+else:
+    st.info("Select rows above and click 'Block Selected' to block.")
 
     st.caption("Tip: Use filters above to find the biggest negative margin leaks!")
