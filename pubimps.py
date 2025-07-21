@@ -93,10 +93,11 @@ def show_pubimps():
         theme="streamlit",
     )
 
-    # --- Fix: Safely check if there are selected rows ---
     selected = grid_response.get('selected_rows', [])
-    if selected is not None and len(selected) > 0:
-        st.success(f"Block action: {len(selected)} product(s) selected. (Product IDs: {', '.join([str(x['Product']) for x in selected])})")
+    # Defensive programming: Only select rows with Product present!
+    selected_ids = [str(x.get('Product', '')) for x in selected if 'Product' in x and x.get('Product', '') != '']
+    if selected_ids:
+        st.success(f"Block action: {len(selected_ids)} product(s) selected. (Product IDs: {', '.join(selected_ids)})")
         if st.button("Block Selected"):
             st.info("✅ These products would now be flagged for blocking (demo mode).")
     else:
