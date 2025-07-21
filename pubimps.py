@@ -26,7 +26,7 @@ def show_pubimps():
 
     with st.expander("🤖 AI Highlights & Actions", expanded=True):
         st.markdown("**Quick Insights:**")
-        if len(top_loss):
+        if len(top_loss) > 0:
             row = top_loss.iloc[0]
             st.write(f"- 🚩 **Highest Loss Product:** `{int(row['Product'])}` is losing **${int(row['Revenue cost'] - row['Gross Revenue']):,}** (margin: {row['Margin_pct']})")
         st.write(f"- 💰 **Total Loss from Negative Margin Products:** <span style='color:red;font-size:1.3em;font-weight:bold;'>-${abs(int(total_loss)):,}</span>", unsafe_allow_html=True)
@@ -94,7 +94,7 @@ def show_pubimps():
     )
 
     selected = grid_response['selected_rows']
-    if selected:
+    if len(selected) > 0:
         st.success(f"Block action: {len(selected)} product(s) selected. (Product IDs: {', '.join([str(x['Product']) for x in selected])})")
         if st.button("Block Selected"):
             st.info("✅ These products would now be flagged for blocking (demo mode).")
