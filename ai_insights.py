@@ -98,15 +98,12 @@ def ai_what_to_do(df_up, df_down):
 
 def show_ai_insights():
     st.header("🧠 AI Insights — Business Impact")
-    uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
-    if uploaded_file:
-        df = pd.read_excel(uploaded_file)
-        st.session_state["main_df"] = df  # SAVE TO SESSION STATE
-    elif "main_df" in st.session_state:
+    # --- NEW: Only use data from memory/session ---
+    if "main_df" in st.session_state:
         df = st.session_state["main_df"]
     else:
-        st.info("Please upload an Excel file to see AI insights.")
+        st.info("No data found. Please make sure the Excel file is loaded in the app.")
         return
 
     required = {'Date', 'Package', 'Gross Revenue', 'eCPM', 'FillRate', 'Margin (%)', 'IVT (%)'}
@@ -308,3 +305,4 @@ Day Before Revenue: {int(prev_rev)}"""
                 st.markdown(answer)
             except Exception as e:
                 st.error(f"AI Error: {e}")
+
