@@ -93,12 +93,15 @@ def show_pubimps():
         theme="streamlit",
     )
 
+    # --- Robustly extract selected Product IDs ---
     selected = grid_response.get('selected_rows', [])
-    # Robust: Only keep rows with Product present and not empty
-    selected_ids = [
-        str(x['Product']) for x in selected
-        if isinstance(x, dict) and 'Product' in x and str(x['Product']).strip() != ''
-    ]
+    selected_ids = []
+    for x in selected:
+        # Defensive: Only use if key exists and is not None/empty
+        product_val = x.get('Product', None)
+        if product_val is not None and product_val != '':
+            selected_ids.append(str(product_val))
+
     if selected_ids:
         st.success(f"Block action: {len(selected_ids)} product(s) selected. (Product IDs: {', '.join(selected_ids)})")
         if st.button("Block Selected"):
